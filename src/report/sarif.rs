@@ -81,7 +81,9 @@ pub struct SarifRuleProperties {
 
 #[derive(Debug, Serialize)]
 pub struct SarifResult {
+  #[serde(rename = "ruleId")]
   pub rule_id: String,
+  #[serde(rename = "ruleIndex")]
   pub rule_index: usize,
   pub level: &'static str,
   pub message: SarifMessage,
@@ -90,11 +92,13 @@ pub struct SarifResult {
 
 #[derive(Debug, Serialize)]
 pub struct SarifLocation {
+  #[serde(rename = "physicalLocation")]
   pub physical_location: SarifPhysicalLocation,
 }
 
 #[derive(Debug, Serialize)]
 pub struct SarifPhysicalLocation {
+  #[serde(rename = "artifactLocation")]
   pub artifact_location: SarifArtifactLocation,
   pub region: SarifRegion,
 }
@@ -102,22 +106,23 @@ pub struct SarifPhysicalLocation {
 #[derive(Debug, Serialize)]
 pub struct SarifArtifactLocation {
   pub uri: String,
-  #[serde(skip_serializing_if = "Option::is_none")]
+  #[serde(rename = "uriBaseId", skip_serializing_if = "Option::is_none")]
   pub uri_base_id: Option<&'static str>,
 }
 
 #[derive(Debug, Serialize)]
 pub struct SarifRegion {
+  #[serde(rename = "startLine")]
   pub start_line: u32,
-  #[serde(skip_serializing_if = "Option::is_none")]
+  #[serde(rename = "startColumn", skip_serializing_if = "Option::is_none")]
   pub start_column: Option<u32>,
-  #[serde(skip_serializing_if = "Option::is_none")]
+  #[serde(rename = "endLine", skip_serializing_if = "Option::is_none")]
   pub end_line: Option<u32>,
-  #[serde(skip_serializing_if = "Option::is_none")]
+  #[serde(rename = "endColumn", skip_serializing_if = "Option::is_none")]
   pub end_column: Option<u32>,
-  #[serde(skip_serializing_if = "Option::is_none")]
+  #[serde(rename = "byteOffset", skip_serializing_if = "Option::is_none")]
   pub byte_offset: Option<usize>,
-  #[serde(skip_serializing_if = "Option::is_none")]
+  #[serde(rename = "byteLength", skip_serializing_if = "Option::is_none")]
   pub byte_length: Option<usize>,
 }
 

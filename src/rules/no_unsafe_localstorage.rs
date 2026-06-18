@@ -130,7 +130,7 @@ mod tests {
   }
 
   #[test]
-  fn flags_setItem_with_token() {
+  fn flags_set_item_with_token() {
     let src = r#"<script setup>
 localStorage.setItem('auth_token', jwt)
 </script>"#;
@@ -154,7 +154,7 @@ localStorage.setItem('theme', 'dark')
   }
 
   #[test]
-  fn ignores_sessionStorage() {
+  fn ignores_session_storage() {
     let src = r#"<script setup>
 sessionStorage.setItem('auth_token', value)
 </script>"#;
@@ -162,7 +162,7 @@ sessionStorage.setItem('auth_token', value)
   }
 
   #[test]
-  fn ignores_getItem() {
+  fn ignores_get_item() {
     let src = r#"<script setup>
 const v = localStorage.getItem('auth_token')
 </script>"#;

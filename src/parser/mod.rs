@@ -59,29 +59,24 @@ fn find_block<'a>(source: &'a str, kind: BlockKind) -> Option<BlockMatch<'a>> {
   let close_pat = format!("</{}", tag);
 
   let bytes = source.as_bytes();
-  let search = 0;
-  while let Some(rel) = find_subslice(&bytes[search..], open_pat.as_bytes()) {
-    let open_offset = search + rel;
-    let after_tag = open_offset + open_pat.len();
-    let attr_end = source[after_tag..]
-      .find('>')
-      .map(|p| after_tag + p)?;
-    let attrs = &source[after_tag..attr_end];
-    let content_start = attr_end + 1;
-    let close_rel = source[content_start..].find(&close_pat)?;
-    let raw_content = &source[content_start..content_start + close_rel];
-    let trimmed_start = raw_content.len() - raw_content.trim_start().len();
-    let content_offset = content_start + trimmed_start;
-    let content = raw_content.trim();
-    return Some(BlockMatch {
-      kind,
-      attrs,
-      content_offset,
-      content,
-      open_offset,
-    });
-  }
-  None
+  let rel = find_subslice(bytes, open_pat.as_bytes())?;
+  let open_offset = rel;
+  let after_tag = open_offset + open_pat.len();
+  let attr_end = source[after_tag..].find('>')? + after_tag;
+  let attrs = &source[after_tag..attr_end];
+  let content_start = attr_end + 1;
+  let close_rel = source[content_start..].find(&close_pat)?;
+  let raw_content = &source[content_start..content_start + close_rel];
+  let trimmed_start = raw_content.len() - raw_content.trim_start().len();
+  let content_offset = content_start + trimmed_start;
+  let content = raw_content.trim();
+  Some(BlockMatch {
+    kind,
+    attrs,
+    content_offset,
+    content,
+    open_offset,
+  })
 }
 
 fn find_subslice(haystack: &[u8], needle: &[u8]) -> Option<usize> {

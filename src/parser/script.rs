@@ -34,6 +34,11 @@ impl SpanInfo {
   pub const fn len(self) -> u32 {
     self.end - self.start
   }
+
+  #[must_use]
+  pub const fn is_empty(self) -> bool {
+    self.end == self.start
+  }
 }
 
 impl From<oxc_span::Span> for SpanInfo {
