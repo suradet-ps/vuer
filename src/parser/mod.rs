@@ -58,6 +58,14 @@ fn find_block<'a>(source: &'a str, kind: BlockKind) -> Option<BlockMatch<'a>> {
   let open_pat = format!("<{}", tag);
   let close_pat = format!("</{}", tag);
 
+  // The SFC block extractor splits the file on `<template>` /
+  // `<script>` / `<style>` boundaries. It is a tiny scanner that runs
+  // once per file. We use byte-level substring search rather than
+  // building a full SFC parser because:
+  //   1. We are looking for *boundaries*, not parsing SFC structure.
+  //   2. The patterns are fixed and small.
+  // The blocks themselves are then handed to the proper AST parsers
+  // (template + script), which are full recursive-descent / oxc parsers.
   let bytes = source.as_bytes();
   let rel = find_subslice(bytes, open_pat.as_bytes())?;
   let open_offset = rel;
@@ -102,6 +110,15 @@ fn kind_tag(kind: BlockKind) -> &'static str {
 }
 
 fn detect_lang(attrs: &str) -> ScriptLang {
+  // This is the only place in the parser where we look at attribute
+  // source text instead of going through the AST, and it is justified
+  // for two reasons:
+  //   1. The SFC's <script> tag is what we are *splitting on*, not a
+  //      Vue element - there is no Vue template AST here yet.
+  //   2. The attribute syntax is fixed and tiny: we only need to know
+  //      whether `lang` is one of {"ts", "typescript"}.
+  // Once a full SFC parser is in place, this should go through the
+  // attribute AST instead.
   if attrs.contains("lang=\"ts\"")
     || attrs.contains("lang='ts'")
     || attrs.contains("lang=\"typescript\"")
