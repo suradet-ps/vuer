@@ -2,53 +2,72 @@ use miette::{Diagnostic, NamedSource, SourceSpan};
 use thiserror::Error;
 
 use crate::context::ScanContext;
-use crate::rules::Rule;
+use crate::parser::template::Attribute;
+use crate::rule_id::RuleId;
+use crate::rules::{Category, Rule};
+use crate::severity::Severity;
+use crate::visitor::for_each_element;
 
 #[derive(Error, Diagnostic, Debug)]
-#[error("`v-html` directive is used, which can lead to XSS vulnerabilities")]
+#[error("Unsafe `v-html` directive renders untrusted HTML")]
 #[diagnostic(
-  code(vue_scanner::no_v_html),
+  code(vue_scanner::security::no_v_html),
   severity(Warning),
   help(
-    "Avoid using `v-html` with dynamic or untrusted content. Use `v-text` or template interpolation instead."
+    "Rendering untrusted HTML can execute arbitrary JavaScript. \
+     Sanitise the input with DOMPurify (or an equivalent library), or use \
+     `v-text` / `{{ }}` interpolation instead."
   )
 )]
 pub struct NoVHtmlViolation {
   #[source_code]
   pub src: NamedSource<String>,
-  #[label("v-html used here")]
+  #[label("`v-html` used here")]
   pub span: SourceSpan,
 }
 
 pub struct NoVHtml;
 
 impl Rule for NoVHtml {
+  fn id(&self) -> RuleId {
+    RuleId::new("vue/security/no-v-html")
+  }
+
   fn name(&self) -> &'static str {
     "no-v-html"
   }
 
   fn description(&self) -> &'static str {
-    "Disallow usage of `v-html` directive to prevent XSS attacks"
+    "Disallow the `v-html` directive to prevent XSS"
+  }
+
+  fn severity(&self) -> Severity {
+    Severity::Critical
+  }
+
+  fn category(&self) -> Category {
+    Category::Security
   }
 
   fn check(&self, ctx: &ScanContext) -> Vec<Box<dyn Diagnostic>> {
     let mut violations = Vec::new();
-    let Some(ref template) = ctx.template else {
+    let Some(root) = ctx.template_ast.as_ref() else {
       return violations;
     };
 
-    let offset = ctx.template_offset;
-    let mut local_offset = 0;
-    for line in template.lines() {
-      if let Some(pos) = line.find("v-html") {
-        let absolute_offset = offset + local_offset + pos;
-        violations.push(Box::new(NoVHtmlViolation {
-          src: ctx.named_source.clone(),
-          span: SourceSpan::new(absolute_offset.into(), 6_usize),
-        }) as Box<dyn Diagnostic>);
+    for_each_element(root, |el| {
+      for attr in &el.attributes {
+        if let Attribute::Directive(d) = attr {
+          if d.name.name == "v-html" {
+            let span = d.span;
+            violations.push(Box::new(NoVHtmlViolation {
+              src: ctx.named_source.clone(),
+              span: SourceSpan::new((span.start as usize).into(), (span.end - span.start) as usize),
+            }));
+          }
+        }
       }
-      local_offset += line.len() + 1;
-    }
+    });
 
     violations
   }
@@ -57,25 +76,46 @@ impl Rule for NoVHtml {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use std::path::PathBuf;
+  use crate::parser::parse_sfc;
 
-  fn make_ctx(template: &str) -> ScanContext {
-    let mut ctx = ScanContext::new(PathBuf::from("test.vue"), template.to_string());
-    ctx.template = Some(template.to_string());
-    ctx
+  fn scan(template: &str) -> Vec<Box<dyn Diagnostic>> {
+    let source = format!("<template>\n{template}\n</template>");
+    let mut ctx = ScanContext::new("test.vue".into(), source);
+    parse_sfc(&mut ctx);
+    NoVHtml.check(&ctx)
   }
 
   #[test]
-  fn test_no_v_html_clean() {
-    let ctx = make_ctx("<template><div>Hello</div></template>");
-    let rule = NoVHtml;
-    assert!(rule.check(&ctx).is_empty());
+  fn no_violation_on_clean_template() {
+    assert!(scan(r#"<div>{{ message }}</div>"#).is_empty());
   }
 
   #[test]
-  fn test_no_v_html_violation() {
-    let ctx = make_ctx("<template><div v-html=\"raw\"></div></template>");
-    let rule = NoVHtml;
-    assert_eq!(rule.check(&ctx).len(), 1);
+  fn flags_v_html_directive() {
+    let v = scan(r#"<div v-html="raw"></div>"#);
+    assert_eq!(v.len(), 1);
+  }
+
+  #[test]
+  fn flags_v_html_with_dynamic_argument() {
+    let v = scan(r#"<div v-html="user.bio"></div>"#);
+    assert_eq!(v.len(), 1);
+  }
+
+  #[test]
+  fn flags_v_html_in_nested_element() {
+    let v = scan(r#"<div><span v-html="raw"></span></div>"#);
+    assert_eq!(v.len(), 1);
+  }
+
+  #[test]
+  fn ignores_static_html_attribute() {
+    // v-html only matches the directive, never a static attribute
+    assert!(scan(r#"<div title="v-html"></div>"#).is_empty());
+  }
+
+  #[test]
+  fn ignores_v_text_directive() {
+    assert!(scan(r#"<div v-text="raw"></div>"#).is_empty());
   }
 }

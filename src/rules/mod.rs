@@ -2,11 +2,37 @@ use miette::Diagnostic;
 use thiserror::Error;
 
 use crate::context::ScanContext;
+use crate::rule_id::RuleId;
+use crate::severity::Severity;
 
 pub mod no_dynamic_bind;
 pub mod no_inline_styles;
 pub mod no_v_html;
 pub mod no_watch_with_callback;
+
+/// A category groups rules so that the user can opt in or out of whole areas
+/// of analysis with a single flag (e.g. `--category security`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Category {
+  Security,
+  BestPractice,
+  Performance,
+  Accessibility,
+  Architecture,
+}
+
+impl Category {
+  #[must_use]
+  pub const fn as_str(self) -> &'static str {
+    match self {
+      Self::Security => "security",
+      Self::BestPractice => "best-practice",
+      Self::Performance => "performance",
+      Self::Accessibility => "accessibility",
+      Self::Architecture => "architecture",
+    }
+  }
+}
 
 #[derive(Error, Diagnostic, Debug)]
 #[error("Unknown rule error")]
@@ -16,9 +42,28 @@ pub struct UnknownRuleError {
   pub name: String,
 }
 
+/// Every rule implements this trait. Rules must be:
+/// * independent of other rules
+/// * deterministic (same input -> same output)
+/// * free of global mutable state, filesystem access, and network access
 pub trait Rule: Send + Sync {
+  /// Stable id used for CLI flag matching, SARIF, and suppression comments.
+  fn id(&self) -> RuleId;
+
+  /// Short human-readable name, used in `vue-scanner --list`.
   fn name(&self) -> &'static str;
+
+  /// One-line description for `vue-scanner --list` and SARIF `shortDescription`.
   fn description(&self) -> &'static str;
+
+  /// Severity bucket for this rule. Stable across runs.
+  fn severity(&self) -> Severity;
+
+  /// Which category this rule belongs to.
+  fn category(&self) -> Category;
+
+  /// The actual analysis. Receives an immutable `ScanContext` and returns
+  /// zero or more diagnostics.
   fn check(&self, ctx: &ScanContext) -> Vec<Box<dyn Diagnostic>>;
 }
 
@@ -41,22 +86,28 @@ impl RuleRegistry {
     &self.rules
   }
 
-  pub fn get_by_name(&self, name: &str) -> Option<&dyn Rule> {
-    self
-      .rules
-      .iter()
-      .find(|r| r.name() == name)
-      .map(|r| r.as_ref())
+  pub fn get_by_id(&self, id: &str) -> Option<&dyn Rule> {
+    self.rules.iter().find(|r| r.id().as_str() == id).map(|r| r.as_ref())
   }
 
-  pub fn get_enabled(&self, enabled_rules: &[String]) -> Vec<&dyn Rule> {
-    if enabled_rules.is_empty() {
+  pub fn get_by_name(&self, name: &str) -> Option<&dyn Rule> {
+    self.rules.iter().find(|r| r.name() == name).map(|r| r.as_ref())
+  }
+
+  /// Filter the registry by id/name list. An empty list means "all rules".
+  pub fn get_enabled(&self, enabled: &[String]) -> Vec<&dyn Rule> {
+    if enabled.is_empty() {
       return self.rules.iter().map(|r| r.as_ref()).collect();
     }
     self
       .rules
       .iter()
-      .filter(|r| enabled_rules.contains(&r.name().to_string()))
+      .filter(|r| {
+        let name = r.name();
+        let id = r.id();
+        let id_str = id.as_str();
+        enabled.iter().any(|e| e == name || e == id_str)
+      })
       .map(|r| r.as_ref())
       .collect()
   }

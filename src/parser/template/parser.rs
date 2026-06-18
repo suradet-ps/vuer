@@ -124,6 +124,14 @@ impl<'a> TemplateParser<'a> {
         },
       }
     }
+
+    // HTML void elements (`<img>`, `<br>`, `<input>`, ...) are implicitly
+    // self-closing. Without this, `<img src="...">` would be flagged as
+    // unterminated, which is wrong both as a parse error and from the user's
+    // point of view.
+    if !self_closing && is_void_element(&name) {
+      self_closing = true;
+    }
     let mut children = Vec::new();
     if !self_closing {
       loop {
@@ -643,5 +651,27 @@ fn is_vue_directive(name: &str) -> bool {
       | "v-pre"
       | "v-cloak"
       | "v-memo"
+  )
+}
+
+/// HTML void elements. These never have a closing tag and never contain
+/// children. Treat them as implicitly self-closing.
+fn is_void_element(name: &str) -> bool {
+  matches!(
+    name,
+    "area"
+      | "base"
+      | "br"
+      | "col"
+      | "embed"
+      | "hr"
+      | "img"
+      | "input"
+      | "link"
+      | "meta"
+      | "param"
+      | "source"
+      | "track"
+      | "wbr"
   )
 }

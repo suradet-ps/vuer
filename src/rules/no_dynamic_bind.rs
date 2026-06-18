@@ -2,100 +2,133 @@ use miette::{Diagnostic, NamedSource, SourceSpan};
 use thiserror::Error;
 
 use crate::context::ScanContext;
-use crate::rules::Rule;
+use crate::parser::template::{Attribute, DirectiveArgument};
+use crate::rule_id::RuleId;
+use crate::rules::{Category, Rule};
+use crate::severity::Severity;
+use crate::visitor::for_each_element;
 
 #[derive(Error, Diagnostic, Debug)]
-#[error("`v-bind:src` with dynamic value can load untrusted resources")]
+#[error("Dynamic `src` binding can load untrusted resources")]
 #[diagnostic(
-  code(vue_scanner::no_dynamic_bind_src),
+  code(vue_scanner::security::no_dynamic_bind_src),
   severity(Warning),
-  help("Validate and sanitize dynamic `src` attributes to prevent loading malicious resources.")
+  help(
+    "Validate and sanitise the URL before binding it. Allow only an explicit \
+     allow-list of schemes (https, /) and hosts, and never concatenate user \
+     input into the URL."
+  )
 )]
 pub struct NoDynamicBindSrcViolation {
   #[source_code]
   pub src: NamedSource<String>,
-  #[label("dynamic src binding here")]
+  #[label("dynamic `src` binding here")]
   pub span: SourceSpan,
 }
 
 pub struct NoDynamicBindSrc;
 
 impl Rule for NoDynamicBindSrc {
+  fn id(&self) -> RuleId {
+    RuleId::new("vue/security/no-dynamic-bind-src")
+  }
+
   fn name(&self) -> &'static str {
     "no-dynamic-bind-src"
   }
 
   fn description(&self) -> &'static str {
-    "Disallow dynamic `v-bind:src` to prevent loading untrusted resources"
+    "Disallow dynamic `src` bindings to prevent loading untrusted resources"
+  }
+
+  fn severity(&self) -> Severity {
+    Severity::High
+  }
+
+  fn category(&self) -> Category {
+    Category::Security
   }
 
   fn check(&self, ctx: &ScanContext) -> Vec<Box<dyn Diagnostic>> {
     let mut violations = Vec::new();
-    let Some(ref template) = ctx.template else {
+    let Some(root) = ctx.template_ast.as_ref() else {
       return violations;
     };
 
-    let offset = ctx.template_offset;
-    for line in template.lines() {
-      let mut search_from = 0;
-      while search_from < line.len() {
-        let remaining = &line[search_from..];
-        let (found, pat_len) = if let Some(pos) = remaining.find("v-bind:src") {
-          (Some(search_from + pos), 10)
-        } else if let Some(pos) = remaining.find(":src") {
-          let abs = search_from + pos;
-          if abs >= 6 && &line[abs - 5..abs] == "bind:" {
-            search_from = abs + 4;
-            continue;
-          }
-          (Some(abs), 4)
-        } else {
-          break;
+    for_each_element(root, |el| {
+      for attr in &el.attributes {
+        let directive = match attr {
+          Attribute::Directive(d) | Attribute::OnDirective(d) => d,
+          _ => continue,
         };
-
-        if let Some(abs_pos) = found {
+        if !is_bind_directive(directive) {
+          continue;
+        }
+        let targets_src = match &directive.argument {
+          Some(DirectiveArgument::Static(arg)) => arg.name == "src",
+          Some(DirectiveArgument::Dynamic(_)) => true,
+          None => false,
+        };
+        if targets_src {
+          let span = directive.span;
           violations.push(Box::new(NoDynamicBindSrcViolation {
             src: ctx.named_source.clone(),
-            span: SourceSpan::new((offset + abs_pos).into(), pat_len),
-          }) as Box<dyn Diagnostic>);
-          search_from = abs_pos + pat_len;
+            span: SourceSpan::new((span.start as usize).into(), (span.end - span.start) as usize),
+          }));
         }
       }
-    }
+    });
 
     violations
   }
 }
 
+fn is_bind_directive(d: &crate::parser::template::Directive) -> bool {
+  matches!(d.name.name.as_str(), "v-bind" | "bind" | ":")
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
-  use std::path::PathBuf;
+  use crate::parser::parse_sfc;
 
-  fn make_ctx(template: &str) -> ScanContext {
-    let mut ctx = ScanContext::new(PathBuf::from("test.vue"), template.to_string());
-    ctx.template = Some(template.to_string());
-    ctx
+  fn scan(template: &str) -> Vec<Box<dyn Diagnostic>> {
+    let source = format!("<template>\n{template}\n</template>");
+    let mut ctx = ScanContext::new("test.vue".into(), source);
+    parse_sfc(&mut ctx);
+    NoDynamicBindSrc.check(&ctx)
   }
 
   #[test]
-  fn test_clean() {
-    let ctx = make_ctx("<template><img src=\"logo.png\"></template>");
-    let rule = NoDynamicBindSrc;
-    assert!(rule.check(&ctx).is_empty());
+  fn clean_static_src_passes() {
+    assert!(scan(r#"<img src="logo.png">"#).is_empty());
   }
 
   #[test]
-  fn test_violation_v_bind_src() {
-    let ctx = make_ctx("<template><img v-bind:src=\"url\"></template>");
-    let rule = NoDynamicBindSrc;
-    assert_eq!(rule.check(&ctx).len(), 1);
+  fn flags_v_bind_src() {
+    assert_eq!(scan(r#"<img v-bind:src="url">"#).len(), 1);
   }
 
   #[test]
-  fn test_violation_short_src() {
-    let ctx = make_ctx("<template><img :src=\"url\"></template>");
-    let rule = NoDynamicBindSrc;
-    assert_eq!(rule.check(&ctx).len(), 1);
+  fn flags_shorthand_bind_src() {
+    assert_eq!(scan(r#"<img :src="url">"#).len(), 1);
+  }
+
+  #[test]
+  fn flags_dynamic_argument_for_src() {
+    assert_eq!(scan(r#"<img :[dynamicAttr]="value">"#).len(), 1);
+  }
+
+  #[test]
+  fn ignores_v_bind_href() {
+    // :href is not :src
+    assert!(scan(r#"<a :href="url">link</a>"#).is_empty());
+  }
+
+  #[test]
+  fn ignores_v_bind_with_literal_value() {
+    // `v-bind:src="'literal'"` is still dynamic from a taint-flow perspective
+    // so we still flag it.
+    assert_eq!(scan(r#"<img v-bind:src="'literal'">"#).len(), 1);
   }
 }
