@@ -5,10 +5,18 @@ use crate::context::ScanContext;
 use crate::rule_id::RuleId;
 use crate::severity::Severity;
 
+pub mod no_dangerous_url;
+pub mod no_document_write;
 pub mod no_dynamic_bind;
+pub mod no_eval;
+pub mod no_inner_html;
 pub mod no_inline_styles;
+pub mod no_unsafe_iframe;
+pub mod no_unsafe_localstorage;
 pub mod no_v_html;
 pub mod no_watch_with_callback;
+pub mod no_open_redirect;
+pub mod v_for_missing_key;
 
 /// A category groups rules so that the user can opt in or out of whole areas
 /// of analysis with a single flag (e.g. `--category security`).
@@ -74,10 +82,20 @@ pub struct RuleRegistry {
 impl RuleRegistry {
   pub fn new() -> Self {
     let rules: Vec<Box<dyn Rule>> = vec![
+      // Security
       Box::new(no_v_html::NoVHtml),
+      Box::new(no_inner_html::NoInnerHtml),
+      Box::new(no_document_write::NoDocumentWrite),
+      Box::new(no_eval::NoEval),
+      Box::new(no_dangerous_url::NoDangerousUrl),
+      Box::new(no_open_redirect::NoOpenRedirect),
+      Box::new(no_unsafe_localstorage::NoUnsafeLocalStorage),
+      Box::new(no_unsafe_iframe::NoUnsafeIframe),
       Box::new(no_dynamic_bind::NoDynamicBindSrc),
+      // Best practice
       Box::new(no_inline_styles::NoInlineStyle),
       Box::new(no_watch_with_callback::NoWatchWithCallback),
+      Box::new(v_for_missing_key::VForMissingKey),
     ];
     Self { rules }
   }

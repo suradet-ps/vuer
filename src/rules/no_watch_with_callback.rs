@@ -1,12 +1,9 @@
 use miette::{Diagnostic, NamedSource, SourceSpan};
 use oxc_allocator::Allocator;
-use oxc_ast::ast::{Argument, CallExpression, Expression};
-use oxc_ast_visit::Visit;
-use oxc_parser::Parser;
-use oxc_span::SourceType;
 use thiserror::Error;
 
-use crate::context::{ScanContext, ScriptLang};
+use crate::context::ScanContext;
+use crate::parser::script::{find_calls, is_call_named, parse_script};
 use crate::rule_id::RuleId;
 use crate::rules::{Category, Rule};
 use crate::severity::Severity;
@@ -58,69 +55,35 @@ impl Rule for NoWatchWithCallback {
     };
 
     let allocator = Allocator::default();
-    let source_type = match ctx.lang {
-      ScriptLang::TypeScript => SourceType::ts(),
-      _ => SourceType::default(),
-    };
-    let parsed = Parser::new(&allocator, script, source_type).parse();
-    if !parsed.diagnostics.is_empty() {
-      return violations;
-    }
+    let program = parse_script(&allocator, script, ctx.lang.clone());
 
-    let mut visitor = WatchCallFinder {
-      violations: &mut violations,
-      named_source: &ctx.named_source,
-      script_offset: ctx.script_offset,
-    };
-    visitor.visit_program(&parsed.program);
+    let matches = find_calls(&program, |call| {
+      if is_call_named(call, &["watch"]) && has_function_arg(call) {
+        Some("watch(source, callback)")
+      } else {
+        None
+      }
+    });
+
+    for m in matches {
+      let absolute = ctx.script_offset as u32 + m.call.start;
+      violations.push(Box::new(NoWatchWithCallbackViolation {
+        src: ctx.named_source.clone(),
+        span: SourceSpan::new((absolute as usize).into(), m.call.len() as usize),
+      }));
+    }
 
     violations
   }
 }
 
-struct WatchCallFinder<'a, 'b> {
-  violations: &'a mut Vec<Box<dyn Diagnostic>>,
-  named_source: &'b NamedSource<String>,
-  script_offset: usize,
-}
-
-impl<'a, 'b> WatchCallFinder<'a, 'b> {
-  fn report(&mut self, call: &CallExpression<'_>) {
-    let span = call.span;
-    let absolute = (self.script_offset as u32 + span.start) as usize;
-    let len = (span.end - span.start) as usize;
-    self.violations.push(Box::new(NoWatchWithCallbackViolation {
-      src: self.named_source.clone(),
-      span: SourceSpan::new(absolute.into(), len),
-    }));
-  }
-}
-
-impl<'a, 'b, 'c> Visit<'c> for WatchCallFinder<'a, 'b> {
-  fn visit_call_expression(&mut self, call: &CallExpression<'c>) {
-    if is_watch_call(call) && has_callback_argument(call) {
-      self.report(call);
-    }
-    // Continue traversal: a watch call can appear inside a deeper expression.
-    self.visit_arguments(&call.arguments);
-    self.visit_expression(&call.callee);
-  }
-}
-
-fn is_watch_call(call: &CallExpression<'_>) -> bool {
-  matches!(&call.callee, Expression::Identifier(ident) if ident.name == "watch")
-}
-
-fn has_callback_argument(call: &CallExpression<'_>) -> bool {
-  call.arguments.len() >= 2 && is_function_like_arg(&call.arguments[1])
-}
-
-fn is_function_like_arg(arg: &Argument<'_>) -> bool {
-  match arg {
-    Argument::ArrowFunctionExpression(_) => true,
-    Argument::FunctionExpression(_) => true,
-    _ => false,
-  }
+fn has_function_arg(call: &oxc_ast::ast::CallExpression<'_>) -> bool {
+  use oxc_ast::ast::Argument;
+  call.arguments.len() >= 2
+    && matches!(
+      call.arguments.get(1),
+      Some(Argument::ArrowFunctionExpression(_) | Argument::FunctionExpression(_))
+    )
 }
 
 #[cfg(test)]

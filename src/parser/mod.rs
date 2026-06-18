@@ -13,6 +13,7 @@
 use crate::context::{ScanContext, ScriptLang};
 use crate::parser::template::{TemplateError, TemplateRoot};
 
+pub mod script;
 pub mod template;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
