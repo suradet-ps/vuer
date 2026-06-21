@@ -91,6 +91,9 @@ fn vulnerable_full_fixture_flags_expected_set() {
     "vue/security/no-document-write",
     "vue/security/no-eval",
     "vue/security/no-unsafe-localstorage",
+    "vue/security/no-postmessage-wildcard",
+    "vue/security/no-window-open-blank-noopener",
+    "vue/security/no-fetch-without-timeout",
     "vue/best-practice/v-for-missing-key",
     "vue/best-practice/no-watch-with-callback",
   ] {

@@ -9,13 +9,16 @@ pub mod no_dangerous_url;
 pub mod no_document_write;
 pub mod no_dynamic_bind;
 pub mod no_eval;
+pub mod no_fetch_without_timeout;
 pub mod no_inline_styles;
 pub mod no_inner_html;
 pub mod no_open_redirect;
+pub mod no_postmessage_wildcard;
 pub mod no_unsafe_iframe;
 pub mod no_unsafe_localstorage;
 pub mod no_v_html;
 pub mod no_watch_with_callback;
+pub mod no_window_open_blank_noopener;
 pub mod v_for_missing_key;
 
 /// A category groups rules so that the user can opt in or out of whole areas
@@ -92,6 +95,9 @@ impl RuleRegistry {
       Box::new(no_unsafe_localstorage::NoUnsafeLocalStorage),
       Box::new(no_unsafe_iframe::NoUnsafeIframe),
       Box::new(no_dynamic_bind::NoDynamicBindSrc),
+      Box::new(no_postmessage_wildcard::NoPostmessageWildcard),
+      Box::new(no_window_open_blank_noopener::NoWindowOpenBlankNoopener),
+      Box::new(no_fetch_without_timeout::NoFetchWithoutTimeout),
       // Best practice
       Box::new(no_inline_styles::NoInlineStyle),
       Box::new(no_watch_with_callback::NoWatchWithCallback),

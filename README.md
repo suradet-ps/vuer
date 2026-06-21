@@ -21,7 +21,9 @@ rule against the resulting AST.
 
 - **Security rules**: `v-html`, `innerHTML`, `document.write`, `eval`,
   `new Function`, dangerous URL schemes, open-redirect, `localStorage`
-  token storage, missing `sandbox` on `iframe`.
+  token storage, missing `sandbox` on `iframe`, `postMessage` with
+  wildcard `targetOrigin`, `window.open` with `_blank` and no `noopener`,
+  `fetch` without an `AbortSignal`.
 - **Vue best practices**: missing `:key` on `v-for`, inline styles,
   `watch` callbacks that may leak.
 - **Severity model**: `Critical` / `High` / `Medium` / `Low` / `Info`,
@@ -127,6 +129,9 @@ vuer --min-severity high --deny-warnings src/
 | `vue/security/no-unsafe-localstorage` | High | security | Disallow auth-looking values in `localStorage` |
 | `vue/security/no-unsafe-iframe` | Medium | security | Disallow `<iframe>` without `sandbox` |
 | `vue/security/no-dynamic-bind-src` | High | security | Disallow dynamic `:src` bindings |
+| `vue/security/no-postmessage-wildcard` | High | security | Disallow `postMessage(..., '*')` |
+| `vue/security/no-window-open-blank-noopener` | High | security | Require `noopener` on `window.open(..., '_blank', ...)` |
+| `vue/security/no-fetch-without-timeout` | High | security | Require an `AbortSignal` on `fetch` |
 | `vue/best-practice/no-inline-style` | Low | best-practice | Disallow inline `style` |
 | `vue/best-practice/no-watch-with-callback` | Low | best-practice | Warn on `watch(src, cb)` without disposal |
 | `vue/best-practice/v-for-missing-key` | Medium | best-practice | Require `:key` on `v-for` |

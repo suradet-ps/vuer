@@ -23,4 +23,7 @@ document.write('<h1>x</h1>')
 eval(input)
 location.href = next
 localStorage.setItem('auth_token', jwt)
+iframe.contentWindow.postMessage({ type: 'ping' }, '*')
+window.open('https://example.com', '_blank')
+fetch('/api/users')
 </script>
