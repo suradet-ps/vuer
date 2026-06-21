@@ -133,34 +133,31 @@ fn assignment_sink<'c>(target: &AssignmentTarget<'c>) -> Option<&'static str> {
     if matches!(&member.object, Expression::Identifier(ident) if ident.name == "location") {
       return Some("location.href");
     }
-    if let Expression::StaticMemberExpression(inner) = &member.object {
-      if inner.property.name == "location" {
-        if let Expression::Identifier(ident) = &inner.object {
-          if ident.name == "window" {
-            return Some("window.location.href");
-          }
-        }
-      }
+    if let Expression::StaticMemberExpression(inner) = &member.object
+      && inner.property.name == "location"
+      && let Expression::Identifier(ident) = &inner.object
+      && ident.name == "window"
+    {
+      return Some("window.location.href");
     }
   }
-  if member.property.name == "location" {
-    if let Expression::Identifier(ident) = &member.object {
-      if ident.name == "window" {
-        return Some("window.location");
-      }
-    }
+  if member.property.name == "location"
+    && let Expression::Identifier(ident) = &member.object
+    && ident.name == "window"
+  {
+    return Some("window.location");
   }
   None
 }
 
 fn call_sink(call: &oxc_ast::ast::CallExpression<'_>) -> Option<&'static str> {
-  if let Expression::StaticMemberExpression(member) = &call.callee {
-    if matches!(&member.object, Expression::Identifier(ident) if ident.name == "location") {
-      match member.property.name.as_str() {
-        "assign" => return Some("location.assign"),
-        "replace" => return Some("location.replace"),
-        _ => {}
-      }
+  if let Expression::StaticMemberExpression(member) = &call.callee
+    && matches!(&member.object, Expression::Identifier(ident) if ident.name == "location")
+  {
+    match member.property.name.as_str() {
+      "assign" => return Some("location.assign"),
+      "replace" => return Some("location.replace"),
+      _ => {}
     }
   }
   None

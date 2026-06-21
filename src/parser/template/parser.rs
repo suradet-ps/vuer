@@ -232,13 +232,12 @@ impl<'a> TemplateParser<'a> {
           }));
         }
       }
-      AttributeKind::Directive => {
+      AttributeKind::Directive if self.peek() == Some(':') => {
         // `v-bind:foo`, `v-on:foo`, or parameter-less like `v-if`, `v-html`
-        if self.peek() == Some(':') {
-          self.bump();
-          argument = Some(self.parse_directive_argument()?);
-        }
+        self.bump();
+        argument = Some(self.parse_directive_argument()?);
       }
+      AttributeKind::Directive => {}
       _ => {}
     }
 
@@ -522,11 +521,11 @@ impl<'a> TemplateParser<'a> {
         let _ = self.parse_comment();
         continue;
       }
-      if let Some(ch) = self.peek() {
-        if ch.is_whitespace() {
-          self.bump();
-          continue;
-        }
+      if let Some(ch) = self.peek()
+        && ch.is_whitespace()
+      {
+        self.bump();
+        continue;
       }
       break;
     }
@@ -556,10 +555,10 @@ impl<'a> TemplateParser<'a> {
     if self.peek() != Some('<') {
       return false;
     }
-    if let Some(next) = self.peek_at(1) {
-      if next.is_ascii_alphabetic() {
-        return true;
-      }
+    if let Some(next) = self.peek_at(1)
+      && next.is_ascii_alphabetic()
+    {
+      return true;
     }
     false
   }

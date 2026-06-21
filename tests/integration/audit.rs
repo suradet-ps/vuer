@@ -387,6 +387,48 @@ fn binary_min_severity_filters() {
 }
 
 #[test]
+fn binary_rules_flag_narrows_to_subset() {
+  use crate::common::Vuer;
+  // Only ask for two rules; verify the JSON output only contains
+  // findings for those rules.
+  let out = Vuer::new()
+    .format("json")
+    .input(fixture("vulnerable_full.vue"))
+    .rules(&["no-v-html", "no-inner-html"])
+    .run();
+  let json: serde_json::Value = serde_json::from_str(&out.stdout).unwrap();
+  let arr = json.as_array().unwrap();
+  assert!(
+    !arr.is_empty(),
+    "expected some findings for the selected rules"
+  );
+  for v in arr {
+    let rule_id = v["rule_id"].as_str().unwrap();
+    assert!(
+      rule_id == "vue/security/no-v-html" || rule_id == "vue/security/no-inner-html",
+      "--rules should narrow output: {v}"
+    );
+  }
+}
+
+#[test]
+fn binary_category_flag_narrows_to_subset() {
+  use crate::common::Vuer;
+  let out = Vuer::new()
+    .format("json")
+    .input(fixture("vulnerable_full.vue"))
+    .category(&["security"])
+    .run();
+  let json: serde_json::Value = serde_json::from_str(&out.stdout).unwrap();
+  for v in json.as_array().unwrap() {
+    assert_eq!(
+      v["category"], "security",
+      "--category should narrow to security: {v}"
+    );
+  }
+}
+
+#[test]
 fn binary_no_ignores_keeps_ignored_violations_visible() {
   use crate::common::Vuer;
   let with_ignores = Vuer::new()
@@ -427,7 +469,6 @@ fn binary_no_ignores_keeps_ignored_violations_visible() {
 #[test]
 fn config_disables_named_rule() {
   use crate::common::Vuer;
-  use std::collections::BTreeMap;
 
   let dir = make_temp_dir("vuer-config-disable");
   std::fs::write(dir.join("vuer.yml"), "disable:\n  - no-inline-style\n").unwrap();

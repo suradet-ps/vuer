@@ -216,10 +216,10 @@ fn print_sarif(violations: &[vuer::scanner::Violation]) {
   // once and hand the (path, source) map to the SARIF builder.
   let mut sources: std::collections::BTreeMap<PathBuf, String> = Default::default();
   for v in violations {
-    if !sources.contains_key(&v.file) {
-      if let Ok(content) = std::fs::read_to_string(&v.file) {
-        sources.insert(v.file.clone(), content);
-      }
+    if !sources.contains_key(&v.file)
+      && let Ok(content) = std::fs::read_to_string(&v.file)
+    {
+      sources.insert(v.file.clone(), content);
     }
   }
   let log = sarif::build_sarif(violations, &sources);
@@ -339,10 +339,10 @@ fn main() {
           return false;
         }
       }
-      if let Some(min) = effective_min_severity {
-        if v.severity < min {
-          return false;
-        }
+      if let Some(min) = effective_min_severity
+        && v.severity < min
+      {
+        return false;
       }
       true
     })

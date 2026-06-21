@@ -163,7 +163,7 @@ fn pretty_output_with_color_codes() {
     .input(fixture("vulnerable.vue"))
     .run();
   assert!(
-    out.combined_stripped().len() > 0,
+    !out.combined_stripped().is_empty(),
     "should produce some output"
   );
   // The output of `vuer --format pretty` should contain at least one

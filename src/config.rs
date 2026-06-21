@@ -74,7 +74,7 @@ impl Config {
         warning: None,
       };
     };
-    let outcome = match std::fs::read_to_string(&path) {
+    match std::fs::read_to_string(&path) {
       Ok(raw) => match serde_yaml::from_str::<Config>(&raw) {
         Ok(config) => LoadOutcome {
           config,
@@ -92,8 +92,7 @@ impl Config {
         source: Some(path.clone()),
         warning: Some(format!("could not read {}: {err}", path.display())),
       },
-    };
-    outcome
+    }
   }
 
   /// True when the rule id (short name or full id) is in `disable`.

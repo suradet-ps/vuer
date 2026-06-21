@@ -81,21 +81,21 @@ impl Rule for NoDangerousUrl {
           }
           _ => None,
         };
-        if let Some(v) = value {
-          if let Some(scheme) = find_dangerous_scheme(v) {
-            let span = match attr {
-              Attribute::Static(s) => s.span,
-              _ => attr.span(),
-            };
-            violations.push(Box::new(NoDangerousUrlViolation {
-              src: ctx.named_source.clone(),
-              span: SourceSpan::new(
-                (span.start as usize).into(),
-                (span.end - span.start) as usize,
-              ),
-              scheme: scheme.to_string(),
-            }));
-          }
+        if let Some(v) = value
+          && let Some(scheme) = find_dangerous_scheme(v)
+        {
+          let span = match attr {
+            Attribute::Static(s) => s.span,
+            _ => attr.span(),
+          };
+          violations.push(Box::new(NoDangerousUrlViolation {
+            src: ctx.named_source.clone(),
+            span: SourceSpan::new(
+              (span.start as usize).into(),
+              (span.end - span.start) as usize,
+            ),
+            scheme: scheme.to_string(),
+          }));
         }
       }
     });
@@ -111,12 +111,10 @@ fn is_href_or_src(d: &crate::parser::template::Directive) -> bool {
 
 fn find_dangerous_scheme(value: &str) -> Option<&'static str> {
   let trimmed = value.trim().trim_start_matches('"').trim_end_matches('"');
-  for prefix in DANGEROUS_PREFIXES {
-    if trimmed.to_ascii_lowercase().starts_with(prefix) {
-      return Some(prefix);
-    }
-  }
-  None
+  DANGEROUS_PREFIXES
+    .iter()
+    .find(|&&prefix| trimmed.to_ascii_lowercase().starts_with(prefix))
+    .copied()
 }
 
 #[cfg(test)]

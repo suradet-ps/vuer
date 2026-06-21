@@ -57,17 +57,17 @@ impl Rule for NoVHtml {
 
     for_each_element(root, |el| {
       for attr in &el.attributes {
-        if let Attribute::Directive(d) = attr {
-          if d.name.name == "v-html" {
-            let span = d.span;
-            violations.push(Box::new(NoVHtmlViolation {
-              src: ctx.named_source.clone(),
-              span: SourceSpan::new(
-                (span.start as usize).into(),
-                (span.end - span.start) as usize,
-              ),
-            }));
-          }
+        if let Attribute::Directive(d) = attr
+          && d.name.name == "v-html"
+        {
+          let span = d.span;
+          violations.push(Box::new(NoVHtmlViolation {
+            src: ctx.named_source.clone(),
+            span: SourceSpan::new(
+              (span.start as usize).into(),
+              (span.end - span.start) as usize,
+            ),
+          }));
         }
       }
     });

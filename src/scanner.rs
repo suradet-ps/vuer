@@ -174,7 +174,7 @@ fn primary_span(d: &(dyn Diagnostic + Send + Sync)) -> (usize, usize) {
   };
   for label in labels {
     let span = label.inner();
-    if span.offset() == 0 && span.len() == 0 {
+    if span.offset() == 0 && span.is_empty() {
       continue;
     }
     return (span.offset(), span.len());
