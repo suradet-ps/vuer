@@ -9,13 +9,13 @@ pub mod no_dangerous_url;
 pub mod no_document_write;
 pub mod no_dynamic_bind;
 pub mod no_eval;
-pub mod no_inner_html;
 pub mod no_inline_styles;
+pub mod no_inner_html;
+pub mod no_open_redirect;
 pub mod no_unsafe_iframe;
 pub mod no_unsafe_localstorage;
 pub mod no_v_html;
 pub mod no_watch_with_callback;
-pub mod no_open_redirect;
 pub mod v_for_missing_key;
 
 /// A category groups rules so that the user can opt in or out of whole areas
@@ -44,7 +44,7 @@ impl Category {
 
 #[derive(Error, Diagnostic, Debug)]
 #[error("Unknown rule error")]
-#[diagnostic(code(vue_scanner::unknown_rule))]
+#[diagnostic(code(vuer::unknown_rule))]
 pub struct UnknownRuleError {
   #[diagnostic(help("Check the rule name and try again."))]
   pub name: String,
@@ -58,10 +58,10 @@ pub trait Rule: Send + Sync {
   /// Stable id used for CLI flag matching, SARIF, and suppression comments.
   fn id(&self) -> RuleId;
 
-  /// Short human-readable name, used in `vue-scanner --list`.
+  /// Short human-readable name, used in `vuer --list`.
   fn name(&self) -> &'static str;
 
-  /// One-line description for `vue-scanner --list` and SARIF `shortDescription`.
+  /// One-line description for `vuer --list` and SARIF `shortDescription`.
   fn description(&self) -> &'static str;
 
   /// Severity bucket for this rule. Stable across runs.
@@ -105,11 +105,19 @@ impl RuleRegistry {
   }
 
   pub fn get_by_id(&self, id: &str) -> Option<&dyn Rule> {
-    self.rules.iter().find(|r| r.id().as_str() == id).map(|r| r.as_ref())
+    self
+      .rules
+      .iter()
+      .find(|r| r.id().as_str() == id)
+      .map(|r| r.as_ref())
   }
 
   pub fn get_by_name(&self, name: &str) -> Option<&dyn Rule> {
-    self.rules.iter().find(|r| r.name() == name).map(|r| r.as_ref())
+    self
+      .rules
+      .iter()
+      .find(|r| r.name() == name)
+      .map(|r| r.as_ref())
   }
 
   /// Filter the registry by id/name list. An empty list means "all rules".

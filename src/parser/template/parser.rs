@@ -16,7 +16,7 @@ use oxc_span::Span;
 
 use super::ast::{
   Attribute, CommentNode, Directive, DirectiveArgument, DirectiveValue, Element, Expression,
-  Identifier, Interpolation, Literal, StaticAttribute, TextNode, TemplateNode, TemplateRoot,
+  Identifier, Interpolation, Literal, StaticAttribute, TemplateNode, TemplateRoot, TextNode,
 };
 
 pub struct TemplateParser<'a> {
@@ -370,7 +370,9 @@ impl<'a> TemplateParser<'a> {
 
   fn parse_attribute_name(&mut self) -> Result<(String, String), TemplateError> {
     let start = self.cursor;
-    let first = self.peek().ok_or_else(|| self.error("Unexpected end of input"))?;
+    let first = self
+      .peek()
+      .ok_or_else(|| self.error("Unexpected end of input"))?;
     if first == ':' || first == '@' || first == '#' {
       self.bump();
       let end = self.cursor;

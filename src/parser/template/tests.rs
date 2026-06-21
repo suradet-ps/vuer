@@ -61,7 +61,11 @@ fn parses_v_html_directive() {
 
 #[test]
 fn parses_shorthand_directives() {
-  let cases = [r#"<img :src="u"/>"#, r#"<button @click="h"/>"#, r#"<Comp #header/>"#];
+  let cases = [
+    r#"<img :src="u"/>"#,
+    r#"<button @click="h"/>"#,
+    r#"<Comp #header/>"#,
+  ];
   for src in cases {
     let (root, errors) = parse_template(src, 0);
     assert!(errors.is_empty(), "errors for {src}: {errors:?}");

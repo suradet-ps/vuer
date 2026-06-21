@@ -11,7 +11,7 @@ use crate::visitor::for_each_element;
 #[derive(Error, Diagnostic, Debug)]
 #[error("`v-for` is missing a `:key` binding")]
 #[diagnostic(
-  code(vue_scanner::best_practice::v_for_missing_key),
+  code(vuer::best_practice::v_for_missing_key),
   severity(Warning),
   help(
     "Without a stable `:key`, Vue falls back to index-based reconciliation \
@@ -56,7 +56,10 @@ impl Rule for VForMissingKey {
     };
 
     for_each_element(root, |el| {
-      let has_v_for = el.attributes.iter().any(|a| matches!(a, Attribute::ForDirective(_)));
+      let has_v_for = el
+        .attributes
+        .iter()
+        .any(|a| matches!(a, Attribute::ForDirective(_)));
       if !has_v_for {
         return;
       }
@@ -71,7 +74,10 @@ impl Rule for VForMissingKey {
         let span = el.span;
         violations.push(Box::new(VForMissingKeyViolation {
           src: ctx.named_source.clone(),
-          span: SourceSpan::new((span.start as usize).into(), (span.end - span.start) as usize),
+          span: SourceSpan::new(
+            (span.start as usize).into(),
+            (span.end - span.start) as usize,
+          ),
         }));
       }
     });
@@ -110,9 +116,7 @@ mod tests {
 
   #[test]
   fn flags_nested_v_for_without_key() {
-    let v = scan(
-      r#"<ul><li v-for="x in xs"><span v-for="y in x.ys">{{ y }}</span></li></ul>"#,
-    );
+    let v = scan(r#"<ul><li v-for="x in xs"><span v-for="y in x.ys">{{ y }}</span></li></ul>"#);
     assert_eq!(v.len(), 2);
   }
 }

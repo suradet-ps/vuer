@@ -11,7 +11,7 @@ use crate::severity::Severity;
 
 #[derive(Error, Diagnostic, Debug)]
 #[error("Could not read file `{path}`")]
-#[diagnostic(code(vue_scanner::file_read_error))]
+#[diagnostic(code(vuer::file_read_error))]
 pub struct FileReadError {
   path: String,
   #[diagnostic(help("Check that the file exists and you have read permissions."))]

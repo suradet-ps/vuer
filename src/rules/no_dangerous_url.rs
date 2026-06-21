@@ -17,7 +17,7 @@ const DANGEROUS_PREFIXES: &[&str] = &["javascript:", "data:text/html", "vbscript
 #[derive(Error, Diagnostic, Debug)]
 #[error("URL with dangerous scheme `{scheme}` is a known XSS vector")]
 #[diagnostic(
-  code(vue_scanner::security::no_dangerous_url),
+  code(vuer::security::no_dangerous_url),
   severity(Warning),
   help(
     "`javascript:`, `data:text/html`, and `vbscript:` URLs execute code in \
@@ -89,7 +89,10 @@ impl Rule for NoDangerousUrl {
             };
             violations.push(Box::new(NoDangerousUrlViolation {
               src: ctx.named_source.clone(),
-              span: SourceSpan::new((span.start as usize).into(), (span.end - span.start) as usize),
+              span: SourceSpan::new(
+                (span.start as usize).into(),
+                (span.end - span.start) as usize,
+              ),
               scheme: scheme.to_string(),
             }));
           }
@@ -143,7 +146,11 @@ mod tests {
 
   #[test]
   fn flags_dynamic_javascript_href() {
-    assert_eq!(scan(r#"<a :href="jsUrl">x</a>"#).len(), 0, "dynamic values without literals are not flagged");
+    assert_eq!(
+      scan(r#"<a :href="jsUrl">x</a>"#).len(),
+      0,
+      "dynamic values without literals are not flagged"
+    );
   }
 
   #[test]

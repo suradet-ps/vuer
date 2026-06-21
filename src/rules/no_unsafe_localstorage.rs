@@ -18,11 +18,11 @@ use crate::severity::Severity;
 /// either as the literal key or as a variable named with those substrings.
 /// This produces a low false-positive rate at the cost of catching fewer
 /// real cases. Users who want stricter analysis should run a dedicated
-/// secrets scanner on top of Vue Scan.
+/// secrets scanner on top of Vuer.
 #[derive(Error, Diagnostic, Debug)]
 #[error("Auth-looking value is being written to `localStorage`")]
 #[diagnostic(
-  code(vue_scanner::security::no_unsafe_localstorage),
+  code(vuer::security::no_unsafe_localstorage),
   severity(Warning),
   help(
     "Tokens in `localStorage` are reachable by any script running on the \

@@ -14,7 +14,7 @@ use crate::severity::Severity;
 #[derive(Error, Diagnostic, Debug)]
 #[error("`.innerHTML` assignment introduces a DOM XSS sink")]
 #[diagnostic(
-  code(vue_scanner::security::no_inner_html),
+  code(vuer::security::no_inner_html),
   severity(Warning),
   help(
     "Setting `.innerHTML` from a dynamic value lets an attacker inject \
@@ -60,7 +60,11 @@ impl Rule for NoInnerHtml {
 
     let allocator = Allocator::default();
     let program = parse_script(&allocator, script, ctx.lang.clone());
-    let mut finder = InnerHtmlFinder { hits: &mut violations, named_source: &ctx.named_source, script_offset: ctx.script_offset };
+    let mut finder = InnerHtmlFinder {
+      hits: &mut violations,
+      named_source: &ctx.named_source,
+      script_offset: ctx.script_offset,
+    };
     finder.visit_program(&program);
     violations
   }

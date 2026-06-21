@@ -58,7 +58,11 @@ pub struct CallMatch {
 
 /// Parse a `<script>` block with oxc. The caller owns the `Allocator` and the
 /// returned `Program` borrows from it.
-pub fn parse_script<'a>(allocator: &'a Allocator, source: &'a str, lang: ScriptLang) -> Program<'a> {
+pub fn parse_script<'a>(
+  allocator: &'a Allocator,
+  source: &'a str,
+  lang: ScriptLang,
+) -> Program<'a> {
   let source_type = match lang {
     ScriptLang::TypeScript => SourceType::ts(),
     _ => SourceType::default(),

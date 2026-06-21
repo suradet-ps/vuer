@@ -8,7 +8,7 @@
 
 use std::path::PathBuf;
 
-use vue_scanner::scanner::Scanner;
+use vuer::scanner::Scanner;
 
 fn fixture(name: &str) -> PathBuf {
   let mut p = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -17,14 +17,14 @@ fn fixture(name: &str) -> PathBuf {
   p
 }
 
-fn scan(name: &str) -> Vec<vue_scanner::scanner::Violation> {
+fn scan(name: &str) -> Vec<vuer::scanner::Violation> {
   let scanner = Scanner::new();
   scanner
     .scan_file(&fixture(name), &[])
     .expect("scan should succeed")
 }
 
-fn rule_ids(violations: &[vue_scanner::scanner::Violation]) -> Vec<&str> {
+fn rule_ids(violations: &[vuer::scanner::Violation]) -> Vec<&str> {
   let mut ids: Vec<&str> = violations.iter().map(|v| v.rule_id.as_str()).collect();
   ids.sort();
   ids
@@ -122,7 +122,7 @@ fn violations_carry_rule_metadata() {
 #[test]
 fn sarif_round_trip_includes_results_and_rules() {
   use std::collections::BTreeMap;
-  use vue_scanner::report::sarif::build_sarif;
+  use vuer::report::sarif::build_sarif;
 
   let violations = scan("vulnerable.vue");
   let source = std::fs::read_to_string(fixture("vulnerable.vue")).unwrap();
@@ -133,7 +133,7 @@ fn sarif_round_trip_includes_results_and_rules() {
   let json = serde_json::to_string(&log).unwrap();
 
   assert!(json.contains("\"version\":\"2.1.0\""));
-  assert!(json.contains("vue-scanner"));
+  assert!(json.contains("vuer"));
   assert!(json.contains("vue/security/no-v-html"));
   assert!(json.contains("\"results\""));
   assert!(json.contains("\"rules\""));

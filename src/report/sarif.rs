@@ -162,7 +162,10 @@ pub fn build_sarif(
   let results: Vec<SarifResult> = violations
     .iter()
     .map(|v| {
-      let source = source_per_file.get(&v.file).map(String::as_str).unwrap_or("");
+      let source = source_per_file
+        .get(&v.file)
+        .map(String::as_str)
+        .unwrap_or("");
       build_result(v, &rule_indices, source)
     })
     .collect();
@@ -173,8 +176,8 @@ pub fn build_sarif(
     runs: vec![SarifRun {
       tool: SarifTool {
         driver: SarifDriver {
-          name: "vue-scanner",
-          information_uri: "https://github.com/suradet-ps/vue-scan",
+          name: "vuer",
+          information_uri: "https://github.com/suradet-ps/vuer",
           version: env!("CARGO_PKG_VERSION"),
           rules,
         },
@@ -241,7 +244,11 @@ fn build_result(v: &Violation, rule_indices: &[RuleId], source: &str) -> SarifRe
   }
 }
 
-fn byte_offset_to_line_col(source: &str, offset: usize, length: usize) -> (u32, Option<u32>, Option<u32>, Option<u32>) {
+fn byte_offset_to_line_col(
+  source: &str,
+  offset: usize,
+  length: usize,
+) -> (u32, Option<u32>, Option<u32>, Option<u32>) {
   if source.is_empty() {
     return (1, None, None, None);
   }
@@ -383,9 +390,9 @@ fn rule_meta(id: &RuleId) -> RuleMeta {
       category: "best-practice",
     },
     _ => RuleMeta {
-      short: "Vue Scan rule",
+      short: "Vuer rule",
       full: "No description available.",
-      help: "Run `vue-scanner --list` for details.",
+      help: "Run `vuer --list` for details.",
       severity: Severity::Info,
       category: "best-practice",
     },
@@ -418,6 +425,6 @@ mod tests {
     let log = build_sarif(&[], &BTreeMap::new());
     let json = serde_json::to_string(&log).unwrap();
     assert!(json.contains("\"version\":\"2.1.0\""));
-    assert!(json.contains("vue-scanner"));
+    assert!(json.contains("vuer"));
   }
 }

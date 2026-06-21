@@ -12,7 +12,7 @@ use crate::severity::Severity;
 #[derive(Error, Diagnostic, Debug)]
 #[error("`eval` and `new Function` execute arbitrary code")]
 #[diagnostic(
-  code(vue_scanner::security::no_eval),
+  code(vuer::security::no_eval),
   severity(Warning),
   help(
     "`eval` (and `new Function`) execute strings as JavaScript. With any \

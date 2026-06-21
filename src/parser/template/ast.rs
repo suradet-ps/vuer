@@ -70,9 +70,10 @@ impl Attribute {
   pub fn span(&self) -> Span {
     match self {
       Self::Static(a) => a.span,
-      Self::Directive(d) | Self::OnDirective(d) | Self::SlotDirective(d) | Self::ForDirective(d) => {
-        d.span
-      }
+      Self::Directive(d)
+      | Self::OnDirective(d)
+      | Self::SlotDirective(d)
+      | Self::ForDirective(d) => d.span,
     }
   }
 }

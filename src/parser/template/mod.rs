@@ -8,7 +8,7 @@ mod parser;
 
 pub use ast::{
   Attribute, CommentNode, Directive, DirectiveArgument, DirectiveValue, Element, Expression,
-  Identifier, Interpolation, Literal, StaticAttribute, TextNode, TemplateNode, TemplateRoot,
+  Identifier, Interpolation, Literal, StaticAttribute, TemplateNode, TemplateRoot, TextNode,
 };
 pub use parser::{TemplateError, TemplateParser};
 

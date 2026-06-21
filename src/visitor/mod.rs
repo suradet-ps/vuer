@@ -16,9 +16,7 @@ pub fn walk(root: &TemplateRoot) {
 pub fn walk_node(node: &TemplateNode) {
   match node {
     TemplateNode::Element(el) => walk_element(el),
-    TemplateNode::Text(_)
-    | TemplateNode::Interpolation(_)
-    | TemplateNode::Comment(_) => {}
+    TemplateNode::Text(_) | TemplateNode::Interpolation(_) | TemplateNode::Comment(_) => {}
   }
 }
 

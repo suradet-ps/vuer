@@ -20,7 +20,7 @@ use crate::severity::Severity;
 #[derive(Error, Diagnostic, Debug)]
 #[error("Unvalidated value is forwarded to a navigation sink")]
 #[diagnostic(
-  code(vue_scanner::security::no_open_redirect),
+  code(vuer::security::no_open_redirect),
   severity(Warning),
   help(
     "Forwarding user-controlled data to `location.*` is a classic open-redirect \

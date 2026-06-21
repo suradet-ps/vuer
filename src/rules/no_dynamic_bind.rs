@@ -11,7 +11,7 @@ use crate::visitor::for_each_element;
 #[derive(Error, Diagnostic, Debug)]
 #[error("Dynamic `src` binding can load untrusted resources")]
 #[diagnostic(
-  code(vue_scanner::security::no_dynamic_bind_src),
+  code(vuer::security::no_dynamic_bind_src),
   severity(Warning),
   help(
     "Validate and sanitise the URL before binding it. Allow only an explicit \
@@ -73,7 +73,10 @@ impl Rule for NoDynamicBindSrc {
           let span = directive.span;
           violations.push(Box::new(NoDynamicBindSrcViolation {
             src: ctx.named_source.clone(),
-            span: SourceSpan::new((span.start as usize).into(), (span.end - span.start) as usize),
+            span: SourceSpan::new(
+              (span.start as usize).into(),
+              (span.end - span.start) as usize,
+            ),
           }));
         }
       }

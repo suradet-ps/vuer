@@ -11,7 +11,7 @@ use crate::visitor::for_each_element;
 #[derive(Error, Diagnostic, Debug)]
 #[error("Inline styles can hurt performance and maintainability")]
 #[diagnostic(
-  code(vue_scanner::best_practice::no_inline_style),
+  code(vuer::best_practice::no_inline_style),
   severity(Info),
   help(
     "Use a CSS class instead. Inline styles bypass the cascade, prevent theming, \
@@ -69,7 +69,10 @@ impl Rule for NoInlineStyle {
           let span = attr.span();
           violations.push(Box::new(NoInlineStyleViolation {
             src: ctx.named_source.clone(),
-            span: SourceSpan::new((span.start as usize).into(), (span.end - span.start) as usize),
+            span: SourceSpan::new(
+              (span.start as usize).into(),
+              (span.end - span.start) as usize,
+            ),
           }));
         }
       }

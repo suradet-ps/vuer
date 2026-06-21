@@ -11,7 +11,7 @@ use crate::visitor::for_each_element;
 #[derive(Error, Diagnostic, Debug)]
 #[error("Unsafe `v-html` directive renders untrusted HTML")]
 #[diagnostic(
-  code(vue_scanner::security::no_v_html),
+  code(vuer::security::no_v_html),
   severity(Warning),
   help(
     "Rendering untrusted HTML can execute arbitrary JavaScript. \
@@ -62,7 +62,10 @@ impl Rule for NoVHtml {
             let span = d.span;
             violations.push(Box::new(NoVHtmlViolation {
               src: ctx.named_source.clone(),
-              span: SourceSpan::new((span.start as usize).into(), (span.end - span.start) as usize),
+              span: SourceSpan::new(
+                (span.start as usize).into(),
+                (span.end - span.start) as usize,
+              ),
             }));
           }
         }

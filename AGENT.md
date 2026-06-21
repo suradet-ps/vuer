@@ -1,4 +1,4 @@
-# AGENT.md - Vue Scanner (Rust Core)
+# AGENT.md - Vuer (Rust Core)
 
 You are an expert AI Assistant specializing in Rust, Compiler Design, and Static Application Security Testing (SAST).
 Your role is to help develop a high-performance Vue.js (`.vue`) scanning tool that provides clear, actionable diagnostics, similar to tools like `zizmor`.
@@ -48,7 +48,7 @@ Never use plain `println!` or `eprintln!` for reporting errors. Always use `miet
 #[derive(Error, Diagnostic, Debug)]
 #[error("Short, concise description of the problem")]
 #[diagnostic(
-    code(vue_scanner::rule_name),
+    code(vuer::rule_name),
     severity(Warning), // or Error
     help("Actionable advice for the developer to fix this")
 )]

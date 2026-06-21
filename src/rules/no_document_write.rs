@@ -11,7 +11,7 @@ use crate::severity::Severity;
 #[derive(Error, Diagnostic, Debug)]
 #[error("`document.write` is a known XSS sink")]
 #[diagnostic(
-  code(vue_scanner::security::no_document_write),
+  code(vuer::security::no_document_write),
   severity(Warning),
   help(
     "`document.write` after page load is almost always an XSS risk. Use \

@@ -5,13 +5,13 @@ use std::process;
 use clap::{Parser, ValueEnum};
 use serde::Serialize;
 
-use vue_scanner::report::sarif;
-use vue_scanner::rules::RuleRegistry;
-use vue_scanner::scanner::Scanner;
+use vuer::report::sarif;
+use vuer::rules::RuleRegistry;
+use vuer::scanner::Scanner;
 
 #[derive(Parser)]
 #[command(
-  name = "vue-scanner",
+  name = "vuer",
   about = "A security-focused AST-based static analyser for Vue.js SFCs",
   version,
   long_about = None
@@ -59,8 +59,8 @@ enum MinSeverity {
 }
 
 impl MinSeverity {
-  fn as_vue_severity(self) -> vue_scanner::severity::Severity {
-    use vue_scanner::severity::Severity;
+  fn as_vuer_severity(self) -> vuer::severity::Severity {
+    use vuer::severity::Severity;
     match self {
       Self::Info => Severity::Info,
       Self::Low => Severity::Low,
@@ -87,8 +87,8 @@ fn list_rules(registry: &RuleRegistry) {
   println!("Use --min-severity <level> to fail only on at least this severity.");
 }
 
-fn print_pretty(violations: &[vue_scanner::scanner::Violation]) {
-  let mut by_file: BTreeMap<PathBuf, Vec<&vue_scanner::scanner::Violation>> = BTreeMap::new();
+fn print_pretty(violations: &[vuer::scanner::Violation]) {
+  let mut by_file: BTreeMap<PathBuf, Vec<&vuer::scanner::Violation>> = BTreeMap::new();
   for v in violations {
     by_file.entry(v.file.clone()).or_default().push(v);
   }
@@ -107,11 +107,11 @@ fn print_pretty(violations: &[vue_scanner::scanner::Violation]) {
       let help = v.diagnostic.help().map(|h| h.to_string());
 
       let severity_str = match v.severity {
-        vue_scanner::severity::Severity::Critical => "\x1b[1;35mcritical\x1b[0m",
-        vue_scanner::severity::Severity::High => "\x1b[1;31mhigh\x1b[0m",
-        vue_scanner::severity::Severity::Medium => "\x1b[1;33mmedium\x1b[0m",
-        vue_scanner::severity::Severity::Low => "\x1b[1;34mlow\x1b[0m",
-        vue_scanner::severity::Severity::Info => "\x1b[1;32minfo\x1b[0m",
+        vuer::severity::Severity::Critical => "\x1b[1;35mcritical\x1b[0m",
+        vuer::severity::Severity::High => "\x1b[1;31mhigh\x1b[0m",
+        vuer::severity::Severity::Medium => "\x1b[1;33mmedium\x1b[0m",
+        vuer::severity::Severity::Low => "\x1b[1;34mlow\x1b[0m",
+        vuer::severity::Severity::Info => "\x1b[1;32minfo\x1b[0m",
       };
 
       let (line_no, col) = if v.span_offset() == 0 && v.span_len() == 0 {
@@ -125,12 +125,13 @@ fn print_pretty(violations: &[vue_scanner::scanner::Violation]) {
         (ln, c)
       };
 
-      let loc = if line_no > 0 { format!(":{}", line_no) } else { String::new() };
+      let loc = if line_no > 0 {
+        format!(":{}", line_no)
+      } else {
+        String::new()
+      };
 
-      eprintln!(
-        "  {} [{}] {}{}",
-        severity_str, v.rule_id, message, loc
-      );
+      eprintln!("  {} [{}] {}{}", severity_str, v.rule_id, message, loc);
 
       if line_no > 0 && line_no <= lines.len() {
         let line_text = lines[line_no - 1];
@@ -161,7 +162,7 @@ struct JsonViolation<'a> {
   byte_length: usize,
 }
 
-fn print_json(violations: &[vue_scanner::scanner::Violation]) {
+fn print_json(violations: &[vuer::scanner::Violation]) {
   let json: Vec<JsonViolation<'_>> = violations
     .iter()
     .map(|v| JsonViolation {
@@ -170,11 +171,11 @@ fn print_json(violations: &[vue_scanner::scanner::Violation]) {
       rule_name: &v.rule_name,
       severity: v.severity.as_str(),
       category: match v.category {
-        vue_scanner::rules::Category::Security => "security",
-        vue_scanner::rules::Category::BestPractice => "best-practice",
-        vue_scanner::rules::Category::Performance => "performance",
-        vue_scanner::rules::Category::Accessibility => "accessibility",
-        vue_scanner::rules::Category::Architecture => "architecture",
+        vuer::rules::Category::Security => "security",
+        vuer::rules::Category::BestPractice => "best-practice",
+        vuer::rules::Category::Performance => "performance",
+        vuer::rules::Category::Accessibility => "accessibility",
+        vuer::rules::Category::Architecture => "architecture",
       },
       message: v.diagnostic_message(),
       help: v.diagnostic.help().map(|h| h.to_string()),
@@ -185,7 +186,7 @@ fn print_json(violations: &[vue_scanner::scanner::Violation]) {
   println!("{}", serde_json::to_string_pretty(&json).unwrap());
 }
 
-fn print_sarif(violations: &[vue_scanner::scanner::Violation]) {
+fn print_sarif(violations: &[vuer::scanner::Violation]) {
   // SARIF needs source bytes for line/column. We read each unique file
   // once and hand the (path, source) map to the SARIF builder.
   let mut sources: std::collections::BTreeMap<PathBuf, String> = Default::default();
@@ -200,9 +201,14 @@ fn print_sarif(violations: &[vue_scanner::scanner::Violation]) {
   println!("{}", serde_json::to_string_pretty(&log).unwrap());
 }
 
-fn print_minimal(violations: &[vue_scanner::scanner::Violation]) {
+fn print_minimal(violations: &[vuer::scanner::Violation]) {
   for v in violations {
-    eprintln!("{}: {}: {}", v.file.display(), v.severity, v.diagnostic_message());
+    eprintln!(
+      "{}: {}: {}",
+      v.file.display(),
+      v.severity,
+      v.diagnostic_message()
+    );
   }
 }
 
@@ -217,7 +223,7 @@ fn main() {
 
   let enabled_rules = cli.rules.unwrap_or_default();
   let mut has_errors = false;
-  let mut all_violations: Vec<vue_scanner::scanner::Violation> = Vec::new();
+  let mut all_violations: Vec<vuer::scanner::Violation> = Vec::new();
 
   for path in &cli.paths {
     if !path.exists() {
@@ -239,23 +245,23 @@ fn main() {
 
   // Filter by category / min severity after the fact, so users can combine
   // the filters.
-  let all_violations: Vec<vue_scanner::scanner::Violation> = all_violations
+  let all_violations: Vec<vuer::scanner::Violation> = all_violations
     .into_iter()
     .filter(|v| {
       if let Some(cats) = &cli.category {
         let cat = match v.category {
-          vue_scanner::rules::Category::Security => "security",
-          vue_scanner::rules::Category::BestPractice => "best-practice",
-          vue_scanner::rules::Category::Performance => "performance",
-          vue_scanner::rules::Category::Accessibility => "accessibility",
-          vue_scanner::rules::Category::Architecture => "architecture",
+          vuer::rules::Category::Security => "security",
+          vuer::rules::Category::BestPractice => "best-practice",
+          vuer::rules::Category::Performance => "performance",
+          vuer::rules::Category::Accessibility => "accessibility",
+          vuer::rules::Category::Architecture => "architecture",
         };
         if !cats.iter().any(|c| c == cat) {
           return false;
         }
       }
       if let Some(min) = cli.min_severity {
-        if v.severity < min.as_vue_severity() {
+        if v.severity < min.as_vuer_severity() {
           return false;
         }
       }

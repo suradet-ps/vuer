@@ -1,9 +1,9 @@
-# Vue Scanner
+# Vuer
 
 A security-focused, AST-based static analyser for Vue.js Single File Components,
 written in Rust. Inspired by `zizmor`, `Ruff`, `Clippy`, `Semgrep`, and `CodeQL`.
 
-Vue Scanner is **not** an ESLint plugin. It parses each `.vue` file with its own
+Vuer is **not** an ESLint plugin. It parses each `.vue` file with its own
 template parser and `oxc_parser` for the script block, then runs every enabled
 rule against the resulting AST.
 
@@ -44,20 +44,20 @@ Or build from source:
 cargo build --release
 ```
 
-The binary is at `target/release/vue-scanner`.
+The binary is at `target/release/vuer`.
 
 ## Usage
 
 ### Scan a single file
 
 ```bash
-vue-scanner src/components/MyComponent.vue
+vuer src/components/MyComponent.vue
 ```
 
 ### Scan a directory
 
 ```bash
-vue-scanner src/
+vuer src/
 ```
 
 This recursively scans all `.vue` files (respecting `.gitignore`).
@@ -65,14 +65,14 @@ This recursively scans all `.vue` files (respecting `.gitignore`).
 ### List available rules
 
 ```bash
-vue-scanner --list
+vuer --list
 ```
 
 ### Run specific rules
 
 ```bash
-vue-scanner --rules no-v-html,no-dynamic-bind-src src/
-vue-scanner --rules vue/security/no-v-html src/
+vuer --rules no-v-html,no-dynamic-bind-src src/
+vuer --rules vue/security/no-v-html src/
 ```
 
 You can mix short names and stable ids.
@@ -80,24 +80,24 @@ You can mix short names and stable ids.
 ### Filter by category or severity
 
 ```bash
-vue-scanner --category security src/
-vue-scanner --min-severity high src/
+vuer --category security src/
+vuer --min-severity high src/
 ```
 
 ### Output formats
 
 ```bash
 # Pretty (default) - coloured diagnostics
-vue-scanner src/
+vuer src/
 
 # JSON - one structured record per finding
-vue-scanner --format json src/
+vuer --format json src/
 
 # SARIF 2.1.0 - GitHub Code Scanning / GitLab
-vue-scanner --format sarif src/ > results.sarif
+vuer --format sarif src/ > results.sarif
 
 # Minimal - one line per violation
-vue-scanner --format minimal src/
+vuer --format minimal src/
 ```
 
 ### CI integration
@@ -105,13 +105,13 @@ vue-scanner --format minimal src/
 Fail with exit code 1 if any violation is found:
 
 ```bash
-vue-scanner --deny-warnings src/
+vuer --deny-warnings src/
 ```
 
 Or only on at least `high` severity:
 
 ```bash
-vue-scanner --min-severity high --deny-warnings src/
+vuer --min-severity high --deny-warnings src/
 ```
 
 ## Available rules

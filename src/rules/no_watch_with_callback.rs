@@ -11,7 +11,7 @@ use crate::severity::Severity;
 #[derive(Error, Diagnostic, Debug)]
 #[error("`watch` with a callback can leak memory if not cleaned up")]
 #[diagnostic(
-  code(vue_scanner::best_practice::no_watch_with_callback),
+  code(vuer::best_practice::no_watch_with_callback),
   severity(Info),
   help(
     "Prefer `watchEffect`, or make sure the watcher is stopped via the returned \

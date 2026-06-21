@@ -1,12 +1,12 @@
 [package]
-name = "vue_scanner"
+name = "vuer"
 version = "0.1.0"
 edition = "2024"
 description = "A high-performance Vue.js SFC scanner with clear, actionable diagnostics"
 license = "MIT"
 
 [[bin]]
-name = "vue-scanner"
+name = "vuer"
 path = "src/main.rs"
 
 [dependencies]
