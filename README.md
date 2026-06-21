@@ -207,6 +207,17 @@ filtering + `.gitignore` checks) and then fans out the per-file
 parsing across the rayon thread pool. On a large Vue monorepo this
 gives a near-linear speedup with the number of cores.
 
+## Documentation
+
+Full reference documentation lives under `docs/`:
+
+* [Installation](docs/installation.md) — install via crates.io, GitHub,
+  pre-built binaries, or from source; editor and CI integration.
+* [Usage](docs/usage.md) — every CLI flag, output format, suppression
+  mechanism, and recommended workflows.
+* [Audits](docs/audits.md) — one section per rule, with vulnerable
+  and safe examples plus remediation advice.
+
 ## Available rules
 
 | Rule id | Severity | Category | Description |
