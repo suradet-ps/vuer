@@ -2,7 +2,10 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::process;
 
+use annotate_snippets::{AnnotationKind, Level, Renderer, Snippet};
+use anstream::eprintln;
 use clap::{Parser, ValueEnum};
+use owo_colors::OwoColorize;
 use serde::Serialize;
 
 use vuer::report::sarif;
@@ -94,72 +97,59 @@ fn list_rules(registry: &RuleRegistry) {
   println!("Use --no-ignores to disable inline `vuer-ignore[...]` comments.");
 }
 
+fn severity_level(sev: vuer::severity::Severity) -> Level<'static> {
+  // Mirror rustc's own colour choice: error red, warning yellow, note cyan.
+  match sev {
+    vuer::severity::Severity::Critical | vuer::severity::Severity::High => Level::ERROR,
+    vuer::severity::Severity::Medium => Level::WARNING,
+    vuer::severity::Severity::Low => Level::NOTE,
+    vuer::severity::Severity::Info => Level::INFO,
+  }
+}
+
 fn print_pretty(violations: &[vuer::scanner::Violation]) {
-  let mut by_file: BTreeMap<PathBuf, Vec<&vuer::scanner::Violation>> = BTreeMap::new();
+  let renderer = Renderer::styled();
+  let mut by_file: BTreeMap<&PathBuf, Vec<&vuer::scanner::Violation>> = BTreeMap::new();
   for v in violations {
-    by_file.entry(v.file.clone()).or_default().push(v);
+    by_file.entry(&v.file).or_default().push(v);
   }
 
   for (file, file_violations) in &by_file {
-    eprintln!("\n\x1b[1;36m{}\x1b[0m", file.display());
+    eprintln!();
+    eprintln!("{}", file.display().to_string().bright_cyan().bold());
 
     let content = match std::fs::read_to_string(file) {
       Ok(c) => c,
       Err(_) => continue,
     };
-    let lines: Vec<&str> = content.lines().collect();
 
     for v in file_violations {
-      let message = v.diagnostic_message();
-      let help = v.diagnostic.help().map(|h| h.to_string());
-
-      let severity_str = match v.severity {
-        vuer::severity::Severity::Critical => "\x1b[1;35mcritical\x1b[0m",
-        vuer::severity::Severity::High => "\x1b[1;31mhigh\x1b[0m",
-        vuer::severity::Severity::Medium => "\x1b[1;33mmedium\x1b[0m",
-        vuer::severity::Severity::Low => "\x1b[1;34mlow\x1b[0m",
-        vuer::severity::Severity::Info => "\x1b[1;32minfo\x1b[0m",
-      };
-
-      let (line_no, col) = if v.span_offset() == 0 && v.span_len() == 0 {
-        (0, 0)
-      } else {
-        let offset = v.span_offset();
-        let before = &content[..offset.min(content.len())];
-        let ln = before.matches('\n').count() + 1;
-        let line_start = before.rfind('\n').map(|p| p + 1).unwrap_or(0);
-        let c = offset - line_start + 1;
-        (ln, c)
-      };
-
-      let loc = if line_no > 0 {
-        format!(":{}", line_no)
-      } else {
-        String::new()
-      };
-      let ignored_tag = if v.ignored {
-        " \x1b[90m(ignored)\x1b[0m"
-      } else {
-        ""
-      };
-
-      eprintln!(
-        "  {} [{}] {}{}{}",
-        severity_str, v.rule_id, message, loc, ignored_tag
+      let mut group = annotate_snippets::Group::with_title(
+        severity_level(v.severity)
+          .primary_title(v.diagnostic_message())
+          .id(v.rule_id.clone()),
       );
 
-      if line_no > 0 && line_no <= lines.len() {
-        let line_text = lines[line_no - 1];
-        eprintln!("  \x1b[90m{} |\x1b[0m {}", line_no, line_text);
-        if col > 0 && col <= line_text.len() {
-          let padding: String = " ".repeat(col.saturating_sub(1));
-          eprintln!("  \x1b[90m{} |\x1b[0m {}^", line_no, padding);
-        }
+      if v.span_offset() != 0 || v.span_len() != 0 {
+        let start = v.span_offset();
+        let end = start + v.span_len();
+        let label = if v.ignored { "(ignored)" } else { "here" };
+        let snippet = Snippet::source(&content)
+          .line_start(1)
+          .path(file.display().to_string())
+          .annotation(
+            AnnotationKind::Primary
+              .span(start..end)
+              .label(label.to_string()),
+          );
+        group = group.element(snippet);
       }
 
-      if let Some(help_text) = help {
-        eprintln!("    \x1b[90mhelp: {}\x1b[0m", help_text);
+      if let Some(help) = v.diagnostic.help() {
+        group = group.element(Level::HELP.message(help.to_string()));
       }
+
+      eprintln!("{}", renderer.render(&[group]).to_string());
     }
   }
 }
@@ -310,16 +300,51 @@ fn main() {
   }
 
   if total_violations == 0 {
-    eprintln!("\x1b[32mNo violations found.\x1b[0m");
-  } else if ignored_count == 0 {
-    eprintln!(
-      "\n\x1b[1;33m{} violation(s) found.\x1b[0m",
-      total_violations
-    );
-  } else {
-    eprintln!(
-      "\n\x1b[1;33m{} violation(s) found ({} ignored).\x1b[0m",
-      total_violations, ignored_count
-    );
+    eprintln!();
+    eprintln!("{}", "No violations found.".green().bold());
+    return;
   }
+
+  // Severity breakdown of *actionable* findings, ordered worst-first.
+  let mut by_sev: BTreeMap<vuer::severity::Severity, usize> = BTreeMap::new();
+  for v in &all_violations {
+    if !v.ignored {
+      *by_sev.entry(v.severity).or_insert(0) += 1;
+    }
+  }
+
+  eprintln!();
+  eprint!(
+    "{n} violation{s}: ",
+    n = total_violations.green(),
+    s = if total_violations == 1 { "" } else { "s" },
+  );
+
+  // Print in worst-first order: Critical, High, Medium, Low, Info.
+  let order = [
+    vuer::severity::Severity::Critical,
+    vuer::severity::Severity::High,
+    vuer::severity::Severity::Medium,
+    vuer::severity::Severity::Low,
+    vuer::severity::Severity::Info,
+  ];
+  let mut parts = Vec::new();
+  for sev in order {
+    if let Some(n) = by_sev.get(&sev) {
+      let count = match sev {
+        vuer::severity::Severity::Critical => n.bright_magenta().to_string(),
+        vuer::severity::Severity::High => n.red().to_string(),
+        vuer::severity::Severity::Medium => n.yellow().to_string(),
+        vuer::severity::Severity::Low => n.cyan().to_string(),
+        vuer::severity::Severity::Info => n.green().to_string(),
+      };
+      parts.push(format!("{count} {}", sev.as_str()));
+    }
+  }
+  eprint!("{}", parts.join(", "));
+
+  if ignored_count > 0 {
+    eprint!(" ({n} ignored)", n = ignored_count.bright_black());
+  }
+  eprintln!();
 }

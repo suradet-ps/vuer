@@ -139,6 +139,33 @@ Use `--no-ignores` to disable every inline suppression and report what
 the linter would otherwise silence. This is the right flag for CI runs
 that want to see the *raw* signal.
 
+## Output
+
+The pretty output is rustc-style: each finding is a coloured
+`error[rule-id]` block with an `--> file:line:col` header, a snippet with
+carets under the violation, and a `= help:` line with the remediation
+advice. The summary at the bottom counts findings by severity, each
+coloured to match the finding (critical = magenta, high = red, medium =
+yellow, low = cyan, info = green).
+
+```text
+error[vue/security/no-v-html]: Unsafe `v-html` directive renders untrusted HTML
+ --> src/components/Post.vue:8:10
+  |
+8 |     <div v-html="user.bio">Bio</div>
+  |          ^^^^^^^^^^^^^^^^^^^ here
+  |
+  = help: Rendering untrusted HTML can execute arbitrary JavaScript. Sanitise the input
+          with DOMPurify (or an equivalent library), or use `v-text` / `{{ }}` interpolation.
+
+13 violations: 3 critical, 7 high, 2 medium, 1 low
+```
+
+Colours are auto-detected from the terminal. They are stripped when
+output is piped to a file, when stdout is not a TTY, or when
+`NO_COLOR=1` is set in the environment. Set `FORCE_COLOR=1` to force
+them on for CI logs.
+
 ## Available rules
 
 | Rule id | Severity | Category | Description |
