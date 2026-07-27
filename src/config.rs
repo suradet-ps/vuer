@@ -123,9 +123,9 @@ fn discover(start: &Path) -> Option<PathBuf> {
     if dir.join(".git").exists() {
       return None;
     }
-    match dir.parent() {
-      Some(parent) => dir = parent,
-      None => return None,
+    {
+      let parent = dir.parent()?;
+      dir = parent
     }
   }
 }
