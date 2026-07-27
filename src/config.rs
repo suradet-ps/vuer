@@ -203,9 +203,11 @@ category:
     // self-contained: the discover() boundary check stops here, so
     // a stray `vuer.yml` in `/tmp`, `$HOME`, or `/` cannot make this
     // test flaky.
-    let dir = tempdir();
-    std::fs::create_dir(dir.join(".git")).unwrap();
-    assert!(discover(&dir).is_none());
+    let dir = tempfile::tempdir().unwrap();
+    let git_dir = dir.path().join(".git");
+    std::fs::create_dir(&git_dir).unwrap();
+    assert!(git_dir.exists(), ".git directory must exist before calling discover");
+    assert!(discover(dir.path()).is_none());
   }
 
   fn tempdir() -> PathBuf {
