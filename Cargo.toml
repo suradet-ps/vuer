@@ -31,7 +31,7 @@ serde_yaml = "0.9"
 atty = "0.2"
 regex = "1.10"
 annotate-snippets = "0.12"
-anstream = "0.6"
+anstream = "1.0"
 owo-colors = { version = "4", features = ["supports-colors"] }
 rayon = "1.10"
 
