@@ -3,9 +3,9 @@ name = "vuer"
 version = "0.1.0"
 edition = "2024"
 # MSRV: the highest minimum across our dependency tree is `oxc` 0.136
-# which requires rustc 1.94.0. Bumping this when we update `oxc` is part
+# which requires rustc 1.97.0. Bumping this when we update `oxc` is part
 # of the dependency review for every release.
-rust-version = "1.94"
+rust-version = "1.97"
 description = "A high-performance Vue.js SFC scanner with clear, actionable diagnostics"
 license = "MIT"
 

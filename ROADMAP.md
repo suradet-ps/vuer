@@ -52,7 +52,7 @@ CI gates in Phase 9.
 
 ## Phase 0: Foundation (done)
 
-- [x] Cargo package `vuer` (edition 2024, MSRV pinned to 1.94.0 to match
+- [x] Cargo package `vuer` (edition 2024, MSRV pinned to 1.97.0 to match
       `oxc` 0.136's requirement; see `Cargo.toml` header comment)
 - [x] CLI via `clap` (derive): paths, `--rules`, `--format`, `--list`,
       `--deny-warnings`, `--no-ignores`, `--no-config`, `--category`,
