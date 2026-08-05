@@ -22,7 +22,7 @@ oxc_parser = "0.136"
 oxc_allocator = "0.136"
 oxc_ast = "0.136"
 oxc_ast_visit = "0.136"
-oxc_span = "0.136"
+oxc_span = "0.143"
 oxc_syntax = "0.136"
 oxc_diagnostics = "0.143"
 serde = { version = "1.0", features = ["derive"] }
