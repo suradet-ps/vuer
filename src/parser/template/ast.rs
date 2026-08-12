@@ -27,6 +27,9 @@ pub enum TemplateNode {
   Text(TextNode),
   Interpolation(Interpolation),
   Comment(CommentNode),
+  /// `<![CDATA[...]]>` inside `<svg>` / `<math>` foreign content. The
+  /// inner text is stored verbatim (entities are not decoded).
+  CData(TextNode),
 }
 
 impl TemplateNode {
@@ -37,6 +40,7 @@ impl TemplateNode {
       Self::Text(t) => t.span,
       Self::Interpolation(i) => i.span,
       Self::Comment(c) => c.span,
+      Self::CData(c) => c.span,
     }
   }
 }

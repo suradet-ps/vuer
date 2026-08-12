@@ -89,40 +89,67 @@ must be proven correct against real-world Vue before we trust it for security
 findings, because a parser that silently mis-reads a node hides findings
 (false negatives) or fabricates them (false positives).
 
-- [ ] **Template parser conformance suite.** A fixture corpus of real Vue
+- [x] **Template parser conformance suite.** A fixture corpus of real Vue
       components (Vue 3 docs examples, Nuxt UI, Element Plus, PrimeVue
       snippets — vendored under `tests/fixtures/templates/`, MIT/Apache
       compatible) that must parse without panic and produce a `TemplateRoot`
       whose element/attribute tree matches an expected structural snapshot.
-- [ ] **Edge cases enumerated and tested:** `<template>` with multiple root
+      Implemented with an original corpus modelled on Vue 3 patterns
+      (login form, product card, data table, SVG, modal, nav menu, settings
+      form); each fixture must parse with zero errors and matches a
+      committed insta snapshot (`tests/conformance.rs`).
+- [x] **Edge cases enumerated and tested:** `<template>` with multiple root
       nodes (Vue 3 fragments), `<slot>`/`v-slot`, `v-bind` dynamic argument
       (`v-bind:[key]`), `v-on` modifiers, self-closing custom elements,
       `<component :is>` and `<Teleport>`/`<Transition>`/`<Suspense>`,
       interpolation with filters removed in Vue 3, whitespace control
       (`v-pre`, `v-once`, `v-cloak`), HTML entities, comments, and CDATA
       in `<svg>`/`<math>` foreign content.
-- [ ] **`TemplateError` surfaced, not swallowed.** Non-fatal parse errors are
+      Implemented as a dedicated suite (`tests/edge_cases.rs`) plus an
+      adversarial corpus that must terminate without panicking. The
+      hardening exposed and fixed real bugs: infinite loops on stray
+      closing tags, CDATA hanging the text lexer, `v-pre` subtrees parsed
+      as interpolation, mismatched closing tags silently accepted, spans
+      that included `}}`/`]`, and a block extractor that truncated the
+      template at a nested `<template v-if>` element.
+- [x] **`TemplateError` surfaced, not swallowed.** Non-fatal parse errors are
       already collected in `ScanContext::template_errors`; rules and the CLI
       summary must *report* them (count malformed files, warn the user) so a
       parse failure degrades to "this file needs review" instead of "this file
       is clean."
-- [ ] **No `unwrap()`/`panic!()` in the parser** outside `#[cfg(test)]`.
+      Implemented: `Scanner` returns a `ScanReport` with `ParseIssue`s; the
+      CLI prints per-error warnings (file, byte offset, message) on stderr
+      and a summary line; `--deny-warnings` fails on malformed files.
+- [x] **No `unwrap()`/`panic!()` in the parser** outside `#[cfg(test)]`.
       Malformed input is a typed `TemplateError`, never a crash. Verify with
       a `grep`/lint gate and an explicit fuzz seed corpus (Phase 8).
-- [ ] **Offset integrity test.** For every parsed node, the reported span
+      Implemented: CI step greps `src/parser/` and fails on any production
+      match; the adversarial corpus in `tests/edge_cases.rs` is the seed
+      list for the Phase 8 fuzz targets.
+- [x] **Offset integrity test.** For every parsed node, the reported span
       resolves to the exact source bytes in the original `.vue` file, not the
       trimmed block. Add a property test that re-slices the source by the
       reported span and asserts it equals the node's text.
-- [ ] **`oxc` upgrade discipline.** Bumping `oxc` re-checks the MSRV pin in
+      Implemented: `tests/offset_integrity.rs` walks every node over the
+      conformance corpus, a canonical corpus, and a generated corpus at two
+      base offsets, asserting slice == node text; also a rule-level spot
+      check that diagnostics land on the AST spans.
+- [x] **`oxc` upgrade discipline.** Bumping `oxc` re-checks the MSRV pin in
       `Cargo.toml` and reviews the `oxc_*` breaking changes. Documented as
       part of the release checklist (Phase 10/11).
-- [ ] **Style block handling.** `BlockKind::Style` is currently extracted but
+      Implemented: `docs/upgrading.md` is the bump checklist (MSRV re-pin,
+      version-cohort coherence, full gate + snapshot review, changelog note).
+- [x] **Style block handling.** `BlockKind::Style` is currently extracted but
       unused. Decide scope: at minimum, emit a structural warning for risky
       patterns (e.g. `expression(...)` in scoped styles is a non-issue, but
       `v-html`-like CSS injection via `:deep()` dynamic values deserves a
       documented "out of scope" note rather than silent ignoring). Make the
       extractor's `Style` arm either used or explicitly `allow(dead_code)`
       with a rationale comment (already half-done).
+      Implemented: the extractor collects every `<style>` block into
+      `ScanContext::style_blocks` (the arm is used); CSS analysis including
+      `:deep()` injection is documented out of scope for v1 in the README's
+      "Scope: `<style>` blocks" section.
 
 ---
 

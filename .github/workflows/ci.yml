@@ -63,5 +63,20 @@ jobs:
       - name: clippy
         run: cargo clippy --all-targets -- -D warnings
 
+      # Phase 1 accuracy floor: the parser must never crash on malformed
+      # input. `unwrap()`/`panic!()` are only allowed in #[cfg(test)]
+      # code (the `tests.rs` module). This grep gate keeps the invariant
+      # mechanical; the fuzz seed corpus lands in Phase 8.
+      - name: parser must not unwrap/panic (production code)
+        run: |
+          matches=$(grep -rEn 'unwrap\(|expect\(|panic!|unreachable!|todo!|unimplemented!' \
+            src/parser/ --include='*.rs' || true)
+          matches=$(printf '%s\n' "$matches" | grep -v '/tests.rs' || true)
+          if [ -n "$matches" ]; then
+            printf '%s\n' "$matches"
+            echo "::error::src/parser production code must not unwrap()/panic!(); malformed input is a TemplateError" >&2
+            exit 1
+          fi
+
       - name: test
         run: cargo test --all-features

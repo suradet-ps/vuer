@@ -182,16 +182,16 @@ category:
   #[test]
   fn discover_finds_vuer_yml_in_cwd() {
     let dir = tempdir();
-    std::fs::write(dir.join("vuer.yml"), "min-severity: high\n").unwrap();
-    let found = discover(&dir).unwrap();
+    std::fs::write(dir.path().join("vuer.yml"), "min-severity: high\n").unwrap();
+    let found = discover(dir.path()).unwrap();
     assert!(found.ends_with("vuer.yml"));
   }
 
   #[test]
   fn discover_walks_up_to_parent() {
     let dir = tempdir();
-    std::fs::write(dir.join(".vuerc.yml"), "min-severity: critical\n").unwrap();
-    let child = dir.join("src");
+    std::fs::write(dir.path().join(".vuerc.yml"), "min-severity: critical\n").unwrap();
+    let child = dir.path().join("src");
     std::fs::create_dir_all(&child).unwrap();
     let found = discover(&child).unwrap();
     assert!(found.ends_with(".vuerc.yml"));
@@ -213,14 +213,13 @@ category:
     assert!(discover(dir.path()).is_none());
   }
 
-  fn tempdir() -> PathBuf {
-    let nanos = std::time::SystemTime::now()
-      .duration_since(std::time::UNIX_EPOCH)
-      .unwrap()
-      .as_nanos();
-    let pid = std::process::id() as u128;
-    let p = std::env::temp_dir().join(format!("vuer-config-test-{pid}-{nanos}"));
-    std::fs::create_dir_all(&p).unwrap();
-    p
+  /// Collision-proof temp dir for discovery tests. The previous helper
+  /// keyed the directory on `pid + SystemTime::as_nanos()`, which
+  /// collides on macOS: its clock resolution is coarser than Linux, so
+  /// parallel tests could get the same nanosecond value, share a
+  /// directory, and shadow each other's config files (a flaky CI
+  /// failure that only showed up on the macOS runner).
+  fn tempdir() -> tempfile::TempDir {
+    tempfile::tempdir().unwrap()
   }
 }

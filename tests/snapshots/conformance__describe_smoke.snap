@@ -1,0 +1,14 @@
+---
+source: tests/conformance.rs
+expression: dump
+---
+root
+  <div v-if="x" class="a" :id="id" @click.prevent="go" v-bind:[k]="v" #slot>
+    {{  name  }}
+    <img src="icon.png" alt=""/>
+    <br/>
+    <!--  note  -->
+    <svg>
+      <![CDATA[<circle/>]]>
+    </svg>
+  </div>

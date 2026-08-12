@@ -11,6 +11,9 @@
 //! 2. No string-searching. Detection of `v-html`, `:src`, etc. is structural.
 //! 3. Errors are recovered when possible so that one bad node does not blank the
 //!    rest of the template.
+//! 4. Panic-free in production: malformed input is a typed
+//!    [`TemplateError`], never a crash, and every recovery path is
+//!    guaranteed to make progress so the parser always terminates.
 
 use oxc_span::Span;
 
@@ -23,12 +26,26 @@ pub struct TemplateParser<'a> {
   source: &'a str,
   base: u32,
   cursor: usize,
+  /// Errors collected while parsing. Child loops push here instead of
+  /// propagating so that one bad node does not abort its whole subtree;
+  /// [`parse`](Self::parse) drains the accumulator at the end.
+  errors: Vec<TemplateError>,
+  /// True while parsing the children of a `v-pre` element. Everything
+  /// below a `v-pre` element is raw text: `{{ }}` is not an
+  /// interpolation and `<b>` is not an element.
+  in_pre: bool,
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct TemplateError {
   pub message: &'static str,
   pub span: Span,
+}
+
+impl std::fmt::Display for TemplateError {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "{}", self.message)
+  }
 }
 
 impl<'a> TemplateParser<'a> {
@@ -38,6 +55,8 @@ impl<'a> TemplateParser<'a> {
       source,
       base,
       cursor: 0,
+      errors: Vec::new(),
+      in_pre: false,
     }
   }
 
@@ -46,7 +65,6 @@ impl<'a> TemplateParser<'a> {
   /// recognise, so rules can still see most of the file.
   pub fn parse(mut self) -> (TemplateRoot, Vec<TemplateError>) {
     let mut children = Vec::new();
-    let mut errors = Vec::new();
     let start = self.abs(0);
     loop {
       self.skip_whitespace();
@@ -56,28 +74,38 @@ impl<'a> TemplateParser<'a> {
       if self.starts_with("<!--") {
         match self.parse_comment() {
           Ok(c) => children.push(TemplateNode::Comment(c)),
-          Err(e) => {
-            errors.push(e);
-          }
+          Err(e) => self.errors.push(e),
         }
+        continue;
+      }
+      if self.starts_with("</") {
+        // A stray closing tag at root level (e.g. an extra `</div>`
+        // after its element already closed). Record the error, consume
+        // the tag, and keep scanning — the parser must always make
+        // progress here or it would loop forever on malformed input.
+        self.errors.push(self.error("Unexpected closing tag"));
+        self.skip_stray_closing_tag();
         continue;
       }
       match self.parse_node() {
         Ok(node) => children.push(node),
         Err(e) => {
-          errors.push(e);
+          self.errors.push(e);
           self.recover_to_next_sibling();
         }
       }
     }
     let span = Span::new(start, self.abs(self.cursor));
-    (TemplateRoot { children, span }, errors)
+    (TemplateRoot { children, span }, self.errors)
   }
 
   fn parse_node(&mut self) -> Result<TemplateNode, TemplateError> {
     if self.peek() == Some('<') {
       if self.starts_with("<!--") {
         return Ok(TemplateNode::Comment(self.parse_comment()?));
+      }
+      if self.starts_with("<![CDATA[") {
+        return Ok(TemplateNode::CData(self.parse_cdata()?));
       }
       if self.starts_with("</") {
         return Err(self.error("Unexpected closing tag"));
@@ -132,25 +160,72 @@ impl<'a> TemplateParser<'a> {
     if !self_closing && is_void_element(&name) {
       self_closing = true;
     }
+
+    // `v-pre` turns the whole subtree into raw text; the element's own
+    // opening tag and attributes are still parsed normally.
+    let prev_pre = self.in_pre;
+    if has_v_pre(&attributes) {
+      self.in_pre = true;
+    }
+
     let mut children = Vec::new();
+    // True when the element was closed by its own `</name>` tag. When a
+    // mismatched closing tag is seen instead, we leave it unconsumed so
+    // the parent can react to it.
+    let mut closed = false;
     if !self_closing {
       loop {
-        self.skip_whitespace_and_comments();
+        self.skip_whitespace();
         if self.eof() {
+          self.in_pre = prev_pre;
           return Err(self.error_at(open_start, "Unterminated element (expected </tag>)"));
         }
         if self.starts_with("</") {
-          break;
+          match self.peek_tag_name() {
+            Some(n) if n == name => {
+              closed = true;
+              break;
+            }
+            Some(_) => {
+              self.errors.push(self.error("Mismatched closing tag"));
+              break;
+            }
+            None => {
+              self.errors.push(self.error("Unexpected closing tag"));
+              self.skip_stray_closing_tag();
+              continue;
+            }
+          }
+        }
+        if self.in_pre {
+          // Raw text down to this element's own closing tag (`</name>`).
+          // Nested tags like `<b>x</b>` inside a `v-pre` subtree stay
+          // raw, mirroring the Vue compiler's raw-text tokenizer.
+          let raw_start = self.cursor;
+          while !self.eof() {
+            if self.starts_with("</") && self.peek_tag_name().as_deref() == Some(name.as_str()) {
+              break;
+            }
+            self.bump();
+          }
+          if self.cursor > raw_start {
+            children.push(TemplateNode::Text(TextNode {
+              text: self.source[raw_start..self.cursor].to_string(),
+              span: Span::new(self.abs(raw_start), self.abs(self.cursor)),
+            }));
+          }
+          continue;
         }
         match self.parse_node() {
           Ok(node) => children.push(node),
-          Err(_) => {
+          Err(e) => {
+            self.errors.push(e);
             self.recover_to_next_sibling();
           }
         }
       }
-      self.skip_whitespace_and_comments();
-      if self.starts_with("</") {
+      self.skip_whitespace();
+      if closed {
         self.bump();
         self.bump();
         let _ = self.parse_tag_name();
@@ -160,6 +235,7 @@ impl<'a> TemplateParser<'a> {
         }
       }
     }
+    self.in_pre = prev_pre;
     let span = Span::new(open_start, self.abs(self.cursor));
     Ok(Element {
       name,
@@ -183,7 +259,10 @@ impl<'a> TemplateParser<'a> {
       kind = AttributeKind::For;
     } else if name == "v-slot" || name == "slot" {
       kind = AttributeKind::Slot;
-    } else if name == "v-on" || name == "v-bind" || is_vue_directive(&name) {
+    } else if name.starts_with("v-") {
+      // Covers the built-ins (`v-if`, `v-show`, `v-model`, `v-bind`,
+      // `v-on`, `v-pre`, `v-once`, `v-cloak`, `v-html`, `v-text`, ...)
+      // as well as user-registered directives (`v-focus`, ...).
       kind = AttributeKind::Directive;
     } else if name == "@" {
       kind = AttributeKind::On;
@@ -209,8 +288,10 @@ impl<'a> TemplateParser<'a> {
         }
       }
       AttributeKind::On => {
-        // `@foo`
-        if matches!(self.peek(), Some(ch) if ch.is_ascii_alphabetic() || ch == '_') {
+        // `@click`, `@[event]`
+        if self.peek() == Some('[') {
+          argument = Some(self.parse_dynamic_argument()?);
+        } else if matches!(self.peek(), Some(ch) if ch.is_ascii_alphabetic() || ch == '_') {
           let (arg_name, arg_raw) = self.parse_attribute_name()?;
           let start = self.abs(self.cursor - arg_name.len());
           argument = Some(DirectiveArgument::Static(Identifier {
@@ -221,8 +302,13 @@ impl<'a> TemplateParser<'a> {
         }
       }
       AttributeKind::Slot => {
-        // `#foo`
-        if matches!(self.peek(), Some(ch) if ch.is_ascii_alphabetic() || ch == '_') {
+        // `#header`, `v-slot:header`, `#[name]`
+        if self.peek() == Some(':') {
+          self.bump();
+          argument = Some(self.parse_directive_argument()?);
+        } else if self.peek() == Some('[') {
+          argument = Some(self.parse_dynamic_argument()?);
+        } else if matches!(self.peek(), Some(ch) if ch.is_ascii_alphabetic() || ch == '_') {
           let (arg_name, arg_raw) = self.parse_attribute_name()?;
           let start = self.abs(self.cursor - arg_name.len());
           argument = Some(DirectiveArgument::Static(Identifier {
@@ -233,7 +319,7 @@ impl<'a> TemplateParser<'a> {
         }
       }
       AttributeKind::Directive if self.peek() == Some(':') => {
-        // `v-bind:foo`, `v-on:foo`, or parameter-less like `v-if`, `v-html`
+        // `v-bind:foo`, `v-on:click`, or parameter-less like `v-if`, `v-html`
         self.bump();
         argument = Some(self.parse_directive_argument()?);
       }
@@ -320,20 +406,36 @@ impl<'a> TemplateParser<'a> {
     self.expect_char('[')?;
     let value_start = self.abs(self.cursor);
     let value_start_byte = self.cursor;
+    // Track bracket nesting (`v-bind:[arr[0]]`) and skip quoted strings
+    // (`v-bind:[']']`) so a `]` inside either does not end the argument.
+    let mut depth = 0_u32;
     while let Some(ch) = self.peek() {
-      if ch == ']' {
+      if ch == ']' && depth == 0 {
         break;
+      }
+      if matches!(ch, '\'' | '"') {
+        self.skip_quoted(ch);
+        continue;
+      }
+      if ch == '[' {
+        depth += 1;
+      } else if ch == ']' {
+        depth = depth.saturating_sub(1);
       }
       self.bump();
     }
     let raw = self.source[value_start_byte..self.cursor].to_string();
+    // The span covers exactly the expression, not the closing `]`.
+    let value_end = self.abs(self.cursor);
     if self.peek() == Some(']') {
       self.bump();
     } else {
       return Err(self.error("Expected `]` in dynamic directive argument"));
     }
-    let span = Span::new(value_start, self.abs(self.cursor));
-    Ok(DirectiveArgument::Dynamic(Expression { raw, span }))
+    Ok(DirectiveArgument::Dynamic(Expression {
+      raw,
+      span: Span::new(value_start, value_end),
+    }))
   }
 
   fn parse_attribute_value(&mut self) -> Result<String, TemplateError> {
@@ -443,7 +545,16 @@ impl<'a> TemplateParser<'a> {
     let start = self.cursor;
     while let Some(ch) = self.peek() {
       if ch == '<' {
-        break;
+        let tag_like = self.starts_with("<!--")
+          || self.starts_with("<![CDATA[")
+          || self.starts_with("</")
+          || self.peek_at(1).is_some_and(|c| c.is_ascii_alphabetic());
+        if tag_like {
+          break;
+        }
+        // A `<` that cannot start a tag (`<1`, `<!foo`, ...) is plain
+        // text. Consuming it here guarantees the text lexer always makes
+        // progress and the parser cannot spin on empty text nodes.
       }
       if ch == '{' && self.peek_at(1) == Some('{') {
         break;
@@ -461,10 +572,24 @@ impl<'a> TemplateParser<'a> {
     self.expect_char('{')?;
     self.expect_char('{')?;
     let value_start = self.cursor;
+    // Track brace nesting (`{{ {a: {b: 1}} }}`) and skip quoted strings
+    // (`{{ "}}" }}`) so a nested `}` / a `}}` inside a string does not
+    // end the interpolation early.
     let mut depth = 0_u32;
     while let Some(ch) = self.peek() {
-      if ch == '}' && self.peek_at(1) == Some('}') {
+      if ch == '}' && self.peek_at(1) == Some('}') && depth == 0 {
         break;
+      }
+      if ch == '<' && self.starts_with("</") && depth == 0 {
+        // An interpolation cannot legally span a closing tag; stop here
+        // so the element can close itself and the unterminated-
+        // interpolation error is reported instead of the parser
+        // swallowing the rest of the file into the expression.
+        break;
+      }
+      if matches!(ch, '\'' | '"' | '`') {
+        self.skip_quoted(ch);
+        continue;
       }
       if ch == '{' {
         depth += 1;
@@ -474,10 +599,12 @@ impl<'a> TemplateParser<'a> {
       self.bump();
     }
     let raw = self.source[value_start..self.cursor].to_string();
-    if self.peek() == Some('}') {
+    // The expression span covers exactly the raw expression; the closing
+    // `}}` is not part of it, so slicing the source by the span yields
+    // the expression text itself.
+    let expression_end = self.abs(self.cursor);
+    if self.starts_with("}}") {
       self.bump();
-    }
-    if self.peek() == Some('}') {
       self.bump();
     } else {
       return Err(self.error_at(interp_start, "Unterminated `{{` interpolation"));
@@ -486,10 +613,32 @@ impl<'a> TemplateParser<'a> {
     Ok(Interpolation {
       expression: Expression {
         raw,
-        span: Span::new(self.abs(value_start), self.abs(self.cursor)),
+        span: Span::new(self.abs(value_start), expression_end),
       },
       span,
     })
+  }
+
+  fn parse_cdata(&mut self) -> Result<TextNode, TemplateError> {
+    let start = self.abs(self.cursor);
+    for _ in 0.."<![CDATA[".len() {
+      self.bump();
+    }
+    let value_start = self.cursor;
+    while !self.eof() {
+      if self.starts_with("]]>") {
+        let text = self.source[value_start..self.cursor].to_string();
+        self.bump();
+        self.bump();
+        self.bump();
+        return Ok(TextNode {
+          text,
+          span: Span::new(start, self.abs(self.cursor)),
+        });
+      }
+      self.bump();
+    }
+    Err(self.error_at(start, "Unterminated CDATA section"))
   }
 
   fn parse_comment(&mut self) -> Result<CommentNode, TemplateError> {
@@ -515,19 +664,25 @@ impl<'a> TemplateParser<'a> {
     Err(self.error_at(start, "Unterminated comment"))
   }
 
-  fn skip_whitespace_and_comments(&mut self) {
-    loop {
-      if self.starts_with("<!--") {
-        let _ = self.parse_comment();
-        continue;
-      }
-      if let Some(ch) = self.peek()
-        && ch.is_whitespace()
-      {
+  /// Consume a quoted string (single, double, or backtick) without
+  /// interpreting escapes. This is a lexer-level skip so that a `}}` or
+  /// `]` inside a string does not end an interpolation or a dynamic
+  /// directive argument early.
+  fn skip_quoted(&mut self, quote: char) {
+    self.bump();
+    while let Some(ch) = self.peek() {
+      if ch == '\\' {
         self.bump();
+        if self.peek().is_some() {
+          self.bump();
+        }
         continue;
       }
-      break;
+      if ch == quote {
+        self.bump();
+        break;
+      }
+      self.bump();
     }
   }
 
@@ -563,15 +718,60 @@ impl<'a> TemplateParser<'a> {
     false
   }
 
-  fn recover_to_next_sibling(&mut self) {
-    while !self.eof() {
-      if self.peek() == Some('<') && self.peek_at(1) != Some('!') {
+  /// Read the tag name of the closing tag at the cursor, if any, without
+  /// consuming it. Used to check that a `</...>` actually closes the
+  /// current element.
+  fn peek_tag_name(&self) -> Option<String> {
+    if !self.starts_with("</") {
+      return None;
+    }
+    let start = self.cursor + 2;
+    let mut end = start;
+    while end < self.source.len() {
+      let byte = self.source.as_bytes()[end];
+      if byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_' {
+        end += 1;
+      } else {
         break;
       }
-      if self.peek() == Some('<') && self.starts_with("<!--") {
-        // skip the comment
+    }
+    if end == start {
+      return None;
+    }
+    Some(self.source[start..end].to_string())
+  }
+
+  /// Consume a stray `</...>` tag (one that does not close the current
+  /// element, or a malformed one like `</>`), guaranteeing progress.
+  fn skip_stray_closing_tag(&mut self) {
+    self.bump();
+    self.bump();
+    let _ = self.parse_tag_name();
+    self.skip_inside_tag_whitespace();
+    if self.peek() == Some('>') {
+      self.bump();
+    }
+  }
+
+  /// Skip forward to the next sibling node: the next element opening tag
+  /// (`<name`), the next closing tag (`</`), or the end of input.
+  /// Comments and CDATA sections are skipped whole. Every other byte is
+  /// consumed one at a time so the recovery itself cannot loop.
+  fn recover_to_next_sibling(&mut self) {
+    while !self.eof() {
+      if self.starts_with("<!--") {
         let _ = self.parse_comment();
         continue;
+      }
+      if self.starts_with("<![CDATA[") {
+        let _ = self.parse_cdata();
+        continue;
+      }
+      let next = self.peek_at(1);
+      if self.peek() == Some('<')
+        && (next.is_some_and(|c| c.is_ascii_alphabetic()) || next == Some('/'))
+      {
+        break;
       }
       self.bump();
     }
@@ -637,22 +837,11 @@ enum AttributeKind {
   For,
 }
 
-fn is_vue_directive(name: &str) -> bool {
-  matches!(
-    name,
-    "v-if"
-      | "v-else"
-      | "v-else-if"
-      | "v-for"
-      | "v-show"
-      | "v-html"
-      | "v-text"
-      | "v-model"
-      | "v-once"
-      | "v-pre"
-      | "v-cloak"
-      | "v-memo"
-  )
+/// True when the attribute list contains `v-pre`; its subtree is raw text.
+fn has_v_pre(attributes: &[Attribute]) -> bool {
+  attributes
+    .iter()
+    .any(|attr| matches!(attr, Attribute::Directive(d) if d.name.name == "v-pre"))
 }
 
 /// HTML void elements. These never have a closing tag and never contain

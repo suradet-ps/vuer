@@ -217,6 +217,7 @@ Full reference documentation lives under `docs/`:
   mechanism, and recommended workflows.
 * [Audits](docs/audits.md) — one section per rule, with vulnerable
   and safe examples plus remediation advice.
+* [Upgrading](docs/upgrading.md) — the `oxc` bump / MSRV discipline.
 
 ## Available rules
 
@@ -264,11 +265,29 @@ Key design decisions:
 - **No `unwrap()`, `expect()`, or `panic!()` in production code.** Errors
   in the SFC extractor and the parsers are surfaced alongside the parsed
   AST; rules that fail to apply skip the file and report zero violations.
+  The template parser is additionally gated in CI against ever adding
+  one.
+- **A parse failure degrades to "needs review", never "clean".** When a
+  `<template>` block does not parse cleanly, the CLI warns per error
+  (file, byte offset, message) and counts the malformed files in the
+  summary; `--deny-warnings` fails the run. Machine formats on stdout
+  (JSON/SARIF) are untouched — the warning goes to stderr.
 - **All rules are independent and deterministic.** They take an
   immutable `ScanContext` and return a `Vec<Box<dyn Diagnostic>>`.
   Running the same file twice produces the same output.
 - **Spans are absolute** - rules produce diagnostics pointing at the
-  original file, not at the trimmed template body.
+  original file, not at the trimmed template body. A property test
+  re-slices the source by every node's span and asserts it equals the
+  node's text (see `tests/offset_integrity.rs`).
+
+### Scope: `<style>` blocks
+
+`<style>` blocks are extracted into `ScanContext::style_blocks` so future
+rules can inspect them, but CSS analysis is **out of scope for v1**. In
+particular, CSS injection via scoped `:deep()` selectors fed by dynamic
+values is documented, not detected: it requires CSS-level data flow that
+the Phase 1/2 taint model does not cover. The extractor's `Style` arm is
+therefore used (extraction) but no rule consumes it yet.
 
 ### Layout
 

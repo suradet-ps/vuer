@@ -21,6 +21,10 @@ pub struct ScanContext {
   /// Non-fatal parse errors encountered while parsing the template. Rules
   /// may inspect or ignore them.
   pub template_errors: Vec<TemplateError>,
+  /// The content of every `<style>` block, in source order. Style analysis
+  /// itself is out of scope for v1 (see README); the blocks are extracted
+  /// so future rules can inspect them without re-reading the source.
+  pub style_blocks: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -44,6 +48,7 @@ impl ScanContext {
       script_offset: 0,
       template_ast: None,
       template_errors: Vec::new(),
+      style_blocks: Vec::new(),
     }
   }
 }

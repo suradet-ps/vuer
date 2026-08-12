@@ -17,7 +17,8 @@ fn scanner_json(fixture_name: &str) -> String {
   let scanner = Scanner::new();
   let violations = scanner
     .scan_file(&fixture(fixture_name), &[], &ScanOptions::default())
-    .expect("scan should succeed");
+    .expect("scan should succeed")
+    .violations;
   let json: Vec<serde_json::Value> = violations
     .iter()
     .map(|v| {
@@ -44,7 +45,8 @@ fn scanner_sarif(fixture_name: &str) -> String {
   let scanner = Scanner::new();
   let violations = scanner
     .scan_file(&fixture(fixture_name), &[], &ScanOptions::default())
-    .expect("scan should succeed");
+    .expect("scan should succeed")
+    .violations;
   let source = std::fs::read_to_string(fixture(fixture_name)).unwrap();
   let mut sources = BTreeMap::new();
   sources.insert(fixture(fixture_name), source);

@@ -7,6 +7,7 @@ use thiserror::Error;
 
 use crate::context::ScanContext;
 use crate::parser::parse_sfc;
+use crate::parser::template::TemplateError;
 use crate::rules::{Category, RuleRegistry};
 use crate::severity::Severity;
 use crate::suppression::violation_is_ignored;
@@ -18,6 +19,24 @@ pub struct FileReadError {
   path: String,
   #[diagnostic(help("Check that the file exists and you have read permissions."))]
   pub source: std::io::Error,
+}
+
+/// One file whose `<template>` block did not parse cleanly. A parse
+/// failure degrades the file to "needs review" — findings computed on a
+/// partial tree may be incomplete, so the CLI warns instead of letting
+/// the file look clean.
+#[derive(Debug)]
+pub struct ParseIssue {
+  pub file: PathBuf,
+  pub errors: Vec<TemplateError>,
+}
+
+/// The result of scanning one path (file or directory).
+#[derive(Debug)]
+pub struct ScanReport {
+  pub violations: Vec<Violation>,
+  /// Files with non-empty `ScanContext::template_errors`.
+  pub parse_issues: Vec<ParseIssue>,
 }
 
 #[derive(Debug)]
@@ -84,7 +103,7 @@ impl Scanner {
     path: &Path,
     enabled_rules: &[String],
     options: &ScanOptions,
-  ) -> Result<Vec<Violation>, Report> {
+  ) -> Result<ScanReport, Report> {
     if path.is_file() {
       return self.scan_file(path, enabled_rules, options);
     }
@@ -104,16 +123,21 @@ impl Scanner {
       .filter(|e| e.path().extension().and_then(|ext| ext.to_str()) == Some("vue"))
       .collect();
 
-    let per_file: Vec<Result<Vec<Violation>, Report>> = entries
+    let per_file: Vec<Result<ScanReport, Report>> = entries
       .par_iter()
       .map(|entry| self.scan_file(entry.path(), enabled_rules, options))
       .collect();
 
-    let mut all = Vec::new();
+    let mut report = ScanReport {
+      violations: Vec::new(),
+      parse_issues: Vec::new(),
+    };
     for result in per_file {
-      all.extend(result?);
+      let scanned = result?;
+      report.violations.extend(scanned.violations);
+      report.parse_issues.extend(scanned.parse_issues);
     }
-    Ok(all)
+    Ok(report)
   }
 
   pub fn scan_file(
@@ -121,7 +145,7 @@ impl Scanner {
     path: &Path,
     enabled_rules: &[String],
     options: &ScanOptions,
-  ) -> Result<Vec<Violation>, Report> {
+  ) -> Result<ScanReport, Report> {
     let source = std::fs::read_to_string(path).map_err(|e| FileReadError {
       path: path.display().to_string(),
       source: e,
@@ -154,7 +178,19 @@ impl Scanner {
       }
     }
 
-    Ok(violations)
+    let parse_issues = if ctx.template_errors.is_empty() {
+      Vec::new()
+    } else {
+      vec![ParseIssue {
+        file: path.to_path_buf(),
+        errors: ctx.template_errors,
+      }]
+    };
+
+    Ok(ScanReport {
+      violations,
+      parse_issues,
+    })
   }
 
   pub fn registry(&self) -> &RuleRegistry {

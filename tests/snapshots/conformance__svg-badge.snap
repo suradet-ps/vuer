@@ -1,0 +1,20 @@
+---
+source: tests/conformance.rs
+expression: describe_root(root)
+---
+root
+  <svg class="badge" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+    <title id="title">
+      "Award badge"
+    </title>
+    <desc id="desc">
+      <![CDATA[A badge with a star <3 and raw & entities]]>
+    </desc>
+    <circle cx="60" cy="60" r="55" fill="var(--accent)"/>
+    <path d="M60 20l12 24 26 4-19 18 4 26-23-12-23 12 4-26-19-18 26-4z" fill="#fff"/>
+    <foreignObject x="20" y="70" width="80" height="30">
+      <div xmlns="http://www.w3.org/1999/xhtml" class="caption">
+        {{  label  }}
+      </div>
+    </foreignObject>
+  </svg>
