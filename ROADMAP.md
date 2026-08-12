@@ -195,6 +195,27 @@ an attribute and flag it. A real SAST tool reasons about *data flow*.
       diagnostic; old rules default to `Syntactic`. `scanner.rs` and the
       report layer consume the new fields only when present.
 
+      Implemented as `src/taint/` (see its module docs for the full model
+      and documented boundaries). Sources, propagators, and sanitizers are
+      implemented per the list; `no-dangerous-url` is intentionally kept
+      syntactic because the dangerous pattern there *is* the literal
+      scheme (documented in `docs/audits.md`). Sinks are detected by the
+      (now taint-gated) rules; the engine exposes `status_at`/`flow_at`
+      per expression span.
+      Implemented: local function calls propagate taint when a tainted
+      argument reaches a parameter the function's return depends on, or
+      when the body returns a tainted closure value (recursion guarded).
+      `emit`/`expose` payloads and cross-file imports are documented
+      out of scope (Phase 6).
+      Implemented: taint-gated rules report `= note: taint from <source>
+      reaches <sink> via <ids>` in pretty output and structured `flow`
+      arrays in JSON; `RuleKind::Taint` marks the re-classified rules.
+      Implemented: `tests/determinism.rs` (byte-identical JSON/SARIF across
+      repeated binary runs over the fixture corpus) plus a per-run unit test
+      asserting identical span facts.
+      Implemented: `Rule::kind()` defaults to `Syntactic`; `Rule::check`
+      returns `Vec<Finding>` (diagnostic + optional `Vec<FlowPath>`);
+      non-taint rules return `flow: None` and the report layers skip it.
 ---
 
 ## Phase 3: Fill the Declared Categories
