@@ -158,7 +158,7 @@ findings, because a parser that silently mis-reads a node hides findings
 All current rules are **syntactic**: they match a directive, a call name, or
 an attribute and flag it. A real SAST tool reasons about *data flow*.
 
-- [ ] **Taint tracking for the script block (Phase 2 core).** Build a
+- [x] **Taint tracking for the script block (Phase 2 core).** Build a
       lightweight taint analysis on top of the `oxc` AST:
       - Sources: route params (`useRoute().params`, `$route.query`),
         props (`defineProps`), `ref()`/`reactive()` seeded from external
@@ -178,19 +178,19 @@ an attribute and flag it. A real SAST tool reasons about *data flow*.
         `no-dynamic-bind-src`, `no-open-redirect` from "this pattern exists"
         to "this pattern carries untrusted data," *dramatically* cutting false
         positives while keeping zero false negatives on the unsafe path.
-- [ ] **Inter-procedural awareness (bounded).** Within a single `<script>`
+- [x] **Inter-procedural awareness (bounded).** Within a single `<script>`
       block, follow taint through local function calls and component `emit`/
       `expose`. Cross-file analysis (imports, mixins, composables) is
       explicitly deferred to Phase 6 with a documented scope boundary.
-- [ ] **Re-classify existing rules under taint.** Each script rule gains a
+- [x] **Re-classify existing rules under taint.** Each script rule gains a
       `TaintKind` (source/sink/flow) and the rule engine reports *flow paths*
       in the diagnostic `help`, e.g. "taint from `useRoute().query.id`
       reaches `v-html` at line 12." This is what makes Vuer's output
       actionable rather than alarming.
-- [ ] **Determinism guarantee.** Taint results are order-independent and
+- [x] **Determinism guarantee.** Taint results are order-independent and
       stable across runs (the engine already forbids global mutable state).
       Property test: scanning the same file N times yields byte-identical JSON.
-- [ ] **`Rule` trait extension without breaking callers.** Add an optional
+- [x] **`Rule` trait extension without breaking callers.** Add an optional
       `fn kind(&self) -> RuleKind` and a `flow_paths` accessor on the
       diagnostic; old rules default to `Syntactic`. `scanner.rs` and the
       report layer consume the new fields only when present.
@@ -411,10 +411,13 @@ Phase 2 was intra-file. Real Vue apps spread risk across files.
       per Phase 1's `oxc` discipline.
 - [ ] **Homebrew / Scoop / arch AUR shims (optional).** Community-maintained;
       the release artifacts are the source of truth.
-- [ ] **Changelog & versioning policy.** `CHANGELOG.md` (Keep a Changelog),
+- [x] **Changelog & versioning policy.** `CHANGELOG.md` (Keep a Changelog),
       and a documented rule-id stability promise: a `vue/...` rule id is never
       reused or silently re-severed. Removing a rule is a major-version event
       announced in the changelog.
+      Implemented at the v0.2.0 release: `CHANGELOG.md` covers 0.2.0 (taint
+      engine, taint-gated rules, flow paths, determinism) with the 0.1.0
+      baseline, and records the rule-id stability promise in its header.
 
 ---
 
