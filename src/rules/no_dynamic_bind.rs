@@ -2,10 +2,11 @@ use miette::{Diagnostic, NamedSource, SourceSpan};
 use thiserror::Error;
 
 use crate::context::ScanContext;
-use crate::parser::template::{Attribute, DirectiveArgument};
+use crate::parser::template::{Attribute, DirectiveArgument, DirectiveValue};
 use crate::rule_id::RuleId;
-use crate::rules::{Category, Finding, Rule};
+use crate::rules::{Category, Finding, Rule, RuleKind};
 use crate::severity::Severity;
+use crate::taint::TaintStatus;
 use crate::visitor::for_each_element;
 
 #[derive(Error, Diagnostic, Debug)]
@@ -49,6 +50,10 @@ impl Rule for NoDynamicBindSrc {
     Category::Security
   }
 
+  fn kind(&self) -> RuleKind {
+    RuleKind::Taint
+  }
+
   fn check(&self, ctx: &ScanContext) -> Vec<Finding> {
     let mut violations = Vec::new();
     let Some(root) = ctx.template_ast.as_ref() else {
@@ -70,14 +75,34 @@ impl Rule for NoDynamicBindSrc {
           None => false,
         };
         if targets_src {
+          // Phase 2: report only when the bound value may carry untrusted
+          // data; clean bindings are the false-positive cut, Unknown is
+          // reported conservatively.
+          let binding_status = match &directive.value {
+            Some(DirectiveValue::Expression(e)) => ctx.taint.status_at(e.span.start),
+            _ => TaintStatus::Clean,
+          };
+          if binding_status == TaintStatus::Clean {
+            continue;
+          }
           let span = directive.span;
-          violations.push(Finding::new(Box::new(NoDynamicBindSrcViolation {
+          let diagnostic = Box::new(NoDynamicBindSrcViolation {
             src: ctx.named_source.clone(),
             span: SourceSpan::new(
               (span.start as usize).into(),
               (span.end - span.start) as usize,
             ),
-          })));
+          });
+          let flow = match &directive.value {
+            Some(DirectiveValue::Expression(e)) => {
+              ctx.taint.flow_at(e.span.start, "dynamic `src` binding")
+            }
+            _ => None,
+          };
+          violations.push(match flow {
+            Some(flow) => Finding::with_flow(diagnostic, vec![flow]),
+            None => Finding::new(diagnostic),
+          });
         }
       }
     });
@@ -95,11 +120,16 @@ mod tests {
   use super::*;
   use crate::parser::parse_sfc;
 
-  fn scan(template: &str) -> Vec<Finding> {
-    let source = format!("<template>\n{template}\n</template>");
+  fn scan_with_script(template: &str, script: &str) -> Vec<Finding> {
+    let source =
+      format!("<template>\n{template}\n</template>\n<script setup>\n{script}\n</script>");
     let mut ctx = ScanContext::new("test.vue".into(), source);
     parse_sfc(&mut ctx);
     NoDynamicBindSrc.check(&ctx)
+  }
+
+  fn scan(template: &str) -> Vec<Finding> {
+    scan_with_script(template, "")
   }
 
   #[test]
@@ -108,30 +138,45 @@ mod tests {
   }
 
   #[test]
-  fn flags_v_bind_src() {
-    assert_eq!(scan(r#"<img v-bind:src="url">"#).len(), 1);
+  fn flags_v_bind_src_with_tainted_value() {
+    let v = scan_with_script(
+      r#"<img v-bind:src="url">"#,
+      "const url = localStorage.getItem('img')",
+    );
+    assert_eq!(v.len(), 1);
   }
 
   #[test]
   fn flags_shorthand_bind_src() {
-    assert_eq!(scan(r#"<img :src="url">"#).len(), 1);
+    let v = scan_with_script(
+      r#"<img :src="url">"#,
+      "const url = localStorage.getItem('img')",
+    );
+    assert_eq!(v.len(), 1);
+    let flow = v[0].flow.as_ref().expect("flow");
+    assert_eq!(flow[0].sink, "dynamic `src` binding");
   }
 
   #[test]
   fn flags_dynamic_argument_for_src() {
-    assert_eq!(scan(r#"<img :[dynamicAttr]="value">"#).len(), 1);
+    let v = scan_with_script(
+      r#"<img :[dynamicAttr]="value">"#,
+      "const value = localStorage.getItem('v')",
+    );
+    assert_eq!(v.len(), 1);
+  }
+
+  #[test]
+  fn stays_silent_for_clean_bindings() {
+    // The false-positive cut: clean/constant bindings are not reported.
+    assert!(scan(r#"<img v-bind:src="'literal'">"#).is_empty());
+    let v = scan_with_script(r#"<img :src="url">"#, "const url = '/static/logo.png'");
+    assert!(v.is_empty());
   }
 
   #[test]
   fn ignores_v_bind_href() {
     // :href is not :src
     assert!(scan(r#"<a :href="url">link</a>"#).is_empty());
-  }
-
-  #[test]
-  fn ignores_v_bind_with_literal_value() {
-    // `v-bind:src="'literal'"` is still dynamic from a taint-flow perspective
-    // so we still flag it.
-    assert_eq!(scan(r#"<img v-bind:src="'literal'">"#).len(), 1);
   }
 }

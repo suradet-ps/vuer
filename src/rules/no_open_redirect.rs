@@ -2,13 +2,15 @@ use miette::{Diagnostic, NamedSource, SourceSpan};
 use oxc_allocator::Allocator;
 use oxc_ast::ast::{AssignmentTarget, Expression};
 use oxc_ast_visit::Visit;
+use oxc_span::GetSpan;
 use thiserror::Error;
 
 use crate::context::ScanContext;
 use crate::parser::script::parse_script;
 use crate::rule_id::RuleId;
-use crate::rules::{Category, Finding, Rule};
+use crate::rules::{Category, Finding, Rule, RuleKind};
 use crate::severity::Severity;
+use crate::taint::TaintStatus;
 
 /// Detect navigations that copy an unvalidated value into a redirect target.
 ///
@@ -59,6 +61,10 @@ impl Rule for NoOpenRedirect {
     Category::Security
   }
 
+  fn kind(&self) -> RuleKind {
+    RuleKind::Taint
+  }
+
   fn check(&self, ctx: &ScanContext) -> Vec<Finding> {
     let mut violations = Vec::new();
     let Some(script) = ctx.script.as_ref() else {
@@ -72,6 +78,7 @@ impl Rule for NoOpenRedirect {
       hits: &mut violations,
       named_source: &ctx.named_source,
       script_offset: ctx.script_offset,
+      taint: &ctx.taint,
     };
     finder.visit_program(&program);
     violations
@@ -82,17 +89,19 @@ struct OpenRedirectFinder<'a, 'b> {
   hits: &'a mut Vec<Finding>,
   named_source: &'b NamedSource<String>,
   script_offset: usize,
+  taint: &'b crate::taint::TaintResult,
 }
 
 impl<'a, 'b, 'c> Visit<'c> for OpenRedirectFinder<'a, 'b> {
   fn visit_assignment_expression(&mut self, expr: &oxc_ast::ast::AssignmentExpression<'c>) {
     if let Some(sink) = assignment_sink(&expr.left) {
-      // Allow assignments of a string literal, but only if the literal
-      // itself is a same-origin URL. A plain string literal in a redirect
-      // is still suspicious but usually a router config rather than an
-      // open-redirect bug.
-      if !is_string_literal(&expr.right) {
-        self.report(expr.span, sink);
+      // Phase 2: report only when the assigned value may carry untrusted
+      // data (subsumes the old "not a string literal" check and cuts
+      // false positives on constant redirects).
+      let rhs_start = self.script_offset as u32 + expr.right.span().start;
+      if self.taint.status_at(rhs_start) != TaintStatus::Clean {
+        let flow = self.taint.flow_at(rhs_start, "navigation assignment");
+        self.report(expr.span, sink, flow);
       }
     }
     self.visit_assignment_target(&expr.left);
@@ -105,8 +114,15 @@ impl<'a, 'b, 'c> Visit<'c> for OpenRedirectFinder<'a, 'b> {
         .arguments
         .first()
         .is_some_and(|a| is_string_literal_arg(a));
-      if !first_is_literal {
-        self.report(call.span, sink);
+      if !first_is_literal
+        && let Some(first) = call.arguments.first()
+        && let Some(e) = first.as_expression()
+      {
+        let arg_start = self.script_offset as u32 + e.span().start;
+        if self.taint.status_at(arg_start) != TaintStatus::Clean {
+          let flow = self.taint.flow_at(arg_start, "navigation call");
+          self.report(call.span, sink, flow);
+        }
       }
     }
     self.visit_arguments(&call.arguments);
@@ -115,15 +131,22 @@ impl<'a, 'b, 'c> Visit<'c> for OpenRedirectFinder<'a, 'b> {
 }
 
 impl<'a, 'b> OpenRedirectFinder<'a, 'b> {
-  fn report(&mut self, span: oxc_span::Span, sink: &'static str) {
+  fn report(
+    &mut self,
+    span: oxc_span::Span,
+    sink: &'static str,
+    flow: Option<crate::taint::FlowPath>,
+  ) {
     let absolute = (self.script_offset as u32 + span.start) as usize;
-    self
-      .hits
-      .push(Finding::new(Box::new(NoOpenRedirectViolation {
-        src: self.named_source.clone(),
-        span: SourceSpan::new(absolute.into(), (span.end - span.start) as usize),
-        sink,
-      })));
+    let diagnostic = Box::new(NoOpenRedirectViolation {
+      src: self.named_source.clone(),
+      span: SourceSpan::new(absolute.into(), (span.end - span.start) as usize),
+      sink,
+    });
+    self.hits.push(match flow {
+      Some(flow) => Finding::with_flow(diagnostic, vec![flow]),
+      None => Finding::new(diagnostic),
+    });
   }
 }
 
@@ -165,10 +188,6 @@ fn call_sink(call: &oxc_ast::ast::CallExpression<'_>) -> Option<&'static str> {
   None
 }
 
-fn is_string_literal(expr: &Expression<'_>) -> bool {
-  matches!(expr, Expression::StringLiteral(_))
-}
-
 fn is_string_literal_arg(arg: &oxc_ast::ast::Argument<'_>) -> bool {
   matches!(arg, oxc_ast::ast::Argument::StringLiteral(_))
 }
@@ -185,16 +204,21 @@ mod tests {
   }
 
   #[test]
-  fn flags_location_href_with_variable() {
+  fn flags_location_href_with_tainted_value() {
     let src = r#"<script setup>
+const next = localStorage.getItem('next')
 location.href = next
 </script>"#;
-    assert_eq!(scan(src).len(), 1);
+    let v = scan(src);
+    assert_eq!(v.len(), 1);
+    let flow = v[0].flow.as_ref().expect("flow");
+    assert_eq!(flow[0].sink, "navigation assignment");
   }
 
   #[test]
   fn flags_window_location_with_variable() {
     let src = r#"<script setup>
+const redirect = localStorage.getItem('r')
 window.location = redirect
 </script>"#;
     assert_eq!(scan(src).len(), 1);
@@ -203,6 +227,7 @@ window.location = redirect
   #[test]
   fn flags_location_assign_call() {
     let src = r#"<script setup>
+const redirect = localStorage.getItem('r')
 location.assign(redirect)
 </script>"#;
     assert_eq!(scan(src).len(), 1);
@@ -211,6 +236,7 @@ location.assign(redirect)
   #[test]
   fn flags_location_replace_call() {
     let src = r#"<script setup>
+const redirect = localStorage.getItem('r')
 location.replace(redirect)
 </script>"#;
     assert_eq!(scan(src).len(), 1);
@@ -220,6 +246,17 @@ location.replace(redirect)
   fn allows_string_literal() {
     let src = r#"<script setup>
 location.href = '/dashboard'
+</script>"#;
+    assert!(scan(src).is_empty());
+  }
+
+  #[test]
+  fn stays_silent_for_clean_values() {
+    // The false-positive cut: a constant redirect (router config style)
+    // is not an open redirect.
+    let src = r#"<script setup>
+const dest = '/dashboard'
+location.href = dest
 </script>"#;
     assert!(scan(src).is_empty());
   }

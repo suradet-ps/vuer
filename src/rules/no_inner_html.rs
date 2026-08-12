@@ -3,13 +3,15 @@ use oxc_allocator::Allocator;
 use oxc_ast::ast::AssignmentTarget;
 use oxc_ast::ast::Expression;
 use oxc_ast_visit::Visit;
+use oxc_span::GetSpan;
 use thiserror::Error;
 
 use crate::context::ScanContext;
 use crate::parser::script::parse_script;
 use crate::rule_id::RuleId;
-use crate::rules::{Category, Finding, Rule};
+use crate::rules::{Category, Finding, Rule, RuleKind};
 use crate::severity::Severity;
+use crate::taint::TaintStatus;
 
 #[derive(Error, Diagnostic, Debug)]
 #[error("`.innerHTML` assignment introduces a DOM XSS sink")]
@@ -52,6 +54,10 @@ impl Rule for NoInnerHtml {
     Category::Security
   }
 
+  fn kind(&self) -> RuleKind {
+    RuleKind::Taint
+  }
+
   fn check(&self, ctx: &ScanContext) -> Vec<Finding> {
     let mut violations = Vec::new();
     let Some(script) = ctx.script.as_ref() else {
@@ -64,6 +70,7 @@ impl Rule for NoInnerHtml {
       hits: &mut violations,
       named_source: &ctx.named_source,
       script_offset: ctx.script_offset,
+      taint: &ctx.taint,
     };
     finder.visit_program(&program);
     violations
@@ -74,17 +81,29 @@ struct InnerHtmlFinder<'a, 'b> {
   hits: &'a mut Vec<Finding>,
   named_source: &'b NamedSource<String>,
   script_offset: usize,
+  taint: &'b crate::taint::TaintResult,
 }
 
 impl<'a, 'b, 'c> Visit<'c> for InnerHtmlFinder<'a, 'b> {
   fn visit_assignment_expression(&mut self, expr: &oxc_ast::ast::AssignmentExpression<'c>) {
     if is_inner_html_target(&expr.left) {
-      let span = expr.span;
-      let absolute = (self.script_offset as u32 + span.start) as usize;
-      self.hits.push(Finding::new(Box::new(NoInnerHtmlViolation {
-        src: self.named_source.clone(),
-        span: SourceSpan::new(absolute.into(), (span.end - span.start) as usize),
-      })));
+      // Phase 2: report only when the assigned value may carry untrusted
+      // data; clean values (literals, constant-derived) are the
+      // false-positive cut, Unknown is reported conservatively.
+      let rhs_start = self.script_offset as u32 + expr.right.span().start;
+      if self.taint.status_at(rhs_start) != TaintStatus::Clean {
+        let span = expr.span;
+        let absolute = (self.script_offset as u32 + span.start) as usize;
+        let diagnostic = Box::new(NoInnerHtmlViolation {
+          src: self.named_source.clone(),
+          span: SourceSpan::new(absolute.into(), (span.end - span.start) as usize),
+        });
+        let flow = self.taint.flow_at(rhs_start, "`.innerHTML` write");
+        self.hits.push(match flow {
+          Some(flow) => Finding::with_flow(diagnostic, vec![flow]),
+          None => Finding::new(diagnostic),
+        });
+      }
     }
     // Recurse to handle nested assignments (`a = b = el.innerHTML = ...`).
     self.visit_assignment_target(&expr.left);
@@ -122,18 +141,38 @@ mod tests {
   #[test]
   fn flags_inner_html_assignment() {
     let src = r#"<script setup>
+const userInput = localStorage.getItem('u')
 const el = document.getElementById('x')
 el.innerHTML = userInput
 </script>"#;
-    assert_eq!(scan(src).len(), 1);
+    let v = scan(src);
+    assert_eq!(v.len(), 1);
+    let flow = v[0].flow.as_ref().expect("flow");
+    assert_eq!(flow[0].sink, "`.innerHTML` write");
+    assert!(flow[0].source.contains("localStorage.getItem"));
   }
 
   #[test]
   fn flags_chained_inner_html() {
     let src = r#"<script setup>
+const x = localStorage.getItem('x')
 root.shadowRoot.innerHTML = x
 </script>"#;
     assert_eq!(scan(src).len(), 1);
+  }
+
+  #[test]
+  fn stays_silent_for_clean_values() {
+    // The false-positive cut: assigning a provably clean value is fine.
+    let src = r#"<script setup>
+el.innerHTML = '<b>static</b>'
+</script>"#;
+    assert!(scan(src).is_empty());
+    let src = r#"<script setup>
+const x = 'trusted'
+el.innerHTML = x
+</script>"#;
+    assert!(scan(src).is_empty());
   }
 
   #[test]
