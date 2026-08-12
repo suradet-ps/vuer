@@ -16,7 +16,10 @@ pub fn walk(root: &TemplateRoot) {
 pub fn walk_node(node: &TemplateNode) {
   match node {
     TemplateNode::Element(el) => walk_element(el),
-    TemplateNode::Text(_) | TemplateNode::Interpolation(_) | TemplateNode::Comment(_) => {}
+    TemplateNode::Text(_)
+    | TemplateNode::Interpolation(_)
+    | TemplateNode::Comment(_)
+    | TemplateNode::CData(_) => {}
   }
 }
 
@@ -37,7 +40,10 @@ pub fn for_each_element_in<F: FnMut(&Element)>(nodes: &[TemplateNode], f: &mut F
         f(el);
         for_each_element_in(&el.children, f);
       }
-      TemplateNode::Text(_) | TemplateNode::Interpolation(_) | TemplateNode::Comment(_) => {}
+      TemplateNode::Text(_)
+      | TemplateNode::Interpolation(_)
+      | TemplateNode::Comment(_)
+      | TemplateNode::CData(_) => {}
     }
   }
 }
