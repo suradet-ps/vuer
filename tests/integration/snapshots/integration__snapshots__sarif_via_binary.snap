@@ -11,7 +11,7 @@ expression: out.stdout
         "driver": {
           "name": "vuer",
           "information_uri": "https://github.com/suradet-ps/vuer",
-          "version": "0.1.0",
+          "version": "0.2.0",
           "rules": [
             {
               "id": "vue/security/no-v-html",
