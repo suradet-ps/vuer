@@ -1601,14 +1601,7 @@ mod tests {
 
   fn analyze_script(script: &str) -> ScanContext {
     let source = format!("<template><div></div></template>\n<script setup>\n{script}\n</script>");
-    let mut ctx = ScanContext::new(PathBuf::from("test.vue"), source);
-    parse_sfc(&mut ctx);
-    ctx
-  }
-
-  fn analyze_template(template: &str) -> ScanContext {
-    let source = format!("<template>{template}</template>");
-    let mut ctx = ScanContext::new(PathBuf::from("test.vue"), source);
+    let mut ctx = ScanContext::new(PathBuf::from("test.vue"), source.to_string());
     parse_sfc(&mut ctx);
     ctx
   }
@@ -1634,7 +1627,7 @@ mod tests {
   // ------------------------------------------------------------------
 
   #[test]
-  fn localStorage_is_a_source() {
+  fn local_storage_is_a_source() {
     let ctx = analyze_script("const x = localStorage.getItem('k')\nconst y = x");
     assert_eq!(
       status_of(&ctx, "localStorage.getItem('k')"),
@@ -1680,10 +1673,8 @@ mod tests {
     assert_eq!(status_of(&ctx, "props.msg"), TaintStatus::Tainted);
     // The bare prop name is seeded too (template binds it directly):
     // `v-html="msg"` is tainted via the template pass.
-    let source = format!(
-      "<template><div v-html=\"msg\"></div></template>\n<script setup>\nconst props = defineProps({{ msg: String }})\n</script>"
-    );
-    let mut ctx = ScanContext::new(PathBuf::from("test.vue"), source);
+    let source = "<template><div v-html=\"msg\"></div></template>\n<script setup>\nconst props = defineProps({ msg: String })\n</script>";
+    let mut ctx = ScanContext::new(PathBuf::from("test.vue"), source.to_string());
     parse_sfc(&mut ctx);
     let root = ctx.template_ast.as_ref().expect("template");
     let TemplateNode::Element(el) = &root.children[0] else {
@@ -1873,12 +1864,8 @@ mod tests {
 
   #[test]
   fn template_binding_referencing_tainted_id_is_tainted() {
-    let ctx = analyze_script("const userInput = localStorage.getItem('u')");
-    // The analysis ran on the whole SFC; re-check the template binding.
-    let source = format!(
-      "<template><div v-html=\"userInput\"></div></template>\n<script setup>\nconst userInput = localStorage.getItem('u')\n</script>"
-    );
-    let mut ctx = ScanContext::new(PathBuf::from("test.vue"), source);
+    let source = "<template><div v-html=\"userInput\"></div></template>\n<script setup>\nconst userInput = localStorage.getItem('u')\n</script>";
+    let mut ctx = ScanContext::new(PathBuf::from("test.vue"), source.to_string());
     parse_sfc(&mut ctx);
     let root = ctx.template_ast.as_ref().expect("template");
     let TemplateNode::Element(el) = &root.children[0] else {
