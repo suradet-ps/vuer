@@ -7,7 +7,7 @@ use thiserror::Error;
 use crate::context::ScanContext;
 use crate::parser::script::parse_script;
 use crate::rule_id::RuleId;
-use crate::rules::{Category, Rule};
+use crate::rules::{Category, Finding, Rule};
 use crate::severity::Severity;
 
 /// Detect navigations that copy an unvalidated value into a redirect target.
@@ -59,7 +59,7 @@ impl Rule for NoOpenRedirect {
     Category::Security
   }
 
-  fn check(&self, ctx: &ScanContext) -> Vec<Box<dyn Diagnostic + Send + Sync>> {
+  fn check(&self, ctx: &ScanContext) -> Vec<Finding> {
     let mut violations = Vec::new();
     let Some(script) = ctx.script.as_ref() else {
       return violations;
@@ -79,7 +79,7 @@ impl Rule for NoOpenRedirect {
 }
 
 struct OpenRedirectFinder<'a, 'b> {
-  hits: &'a mut Vec<Box<dyn Diagnostic + Send + Sync>>,
+  hits: &'a mut Vec<Finding>,
   named_source: &'b NamedSource<String>,
   script_offset: usize,
 }
@@ -117,11 +117,13 @@ impl<'a, 'b, 'c> Visit<'c> for OpenRedirectFinder<'a, 'b> {
 impl<'a, 'b> OpenRedirectFinder<'a, 'b> {
   fn report(&mut self, span: oxc_span::Span, sink: &'static str) {
     let absolute = (self.script_offset as u32 + span.start) as usize;
-    self.hits.push(Box::new(NoOpenRedirectViolation {
-      src: self.named_source.clone(),
-      span: SourceSpan::new(absolute.into(), (span.end - span.start) as usize),
-      sink,
-    }));
+    self
+      .hits
+      .push(Finding::new(Box::new(NoOpenRedirectViolation {
+        src: self.named_source.clone(),
+        span: SourceSpan::new(absolute.into(), (span.end - span.start) as usize),
+        sink,
+      })));
   }
 }
 
@@ -176,7 +178,7 @@ mod tests {
   use super::*;
   use crate::parser::parse_sfc;
 
-  fn scan(source: &str) -> Vec<Box<dyn Diagnostic + Send + Sync>> {
+  fn scan(source: &str) -> Vec<Finding> {
     let mut ctx = ScanContext::new("test.vue".into(), source.to_string());
     parse_sfc(&mut ctx);
     NoOpenRedirect.check(&ctx)

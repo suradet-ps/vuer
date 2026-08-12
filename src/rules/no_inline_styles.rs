@@ -4,7 +4,7 @@ use thiserror::Error;
 use crate::context::ScanContext;
 use crate::parser::template::Attribute;
 use crate::rule_id::RuleId;
-use crate::rules::{Category, Rule};
+use crate::rules::{Category, Finding, Rule};
 use crate::severity::Severity;
 use crate::visitor::for_each_element;
 
@@ -48,7 +48,7 @@ impl Rule for NoInlineStyle {
     Category::BestPractice
   }
 
-  fn check(&self, ctx: &ScanContext) -> Vec<Box<dyn Diagnostic + Send + Sync>> {
+  fn check(&self, ctx: &ScanContext) -> Vec<Finding> {
     let mut violations = Vec::new();
     let Some(root) = ctx.template_ast.as_ref() else {
       return violations;
@@ -67,13 +67,13 @@ impl Rule for NoInlineStyle {
         };
         if matches {
           let span = attr.span();
-          violations.push(Box::new(NoInlineStyleViolation {
+          violations.push(Finding::new(Box::new(NoInlineStyleViolation {
             src: ctx.named_source.clone(),
             span: SourceSpan::new(
               (span.start as usize).into(),
               (span.end - span.start) as usize,
             ),
-          }));
+          })));
         }
       }
     });
@@ -87,7 +87,7 @@ mod tests {
   use super::*;
   use crate::parser::parse_sfc;
 
-  fn scan(template: &str) -> Vec<Box<dyn Diagnostic + Send + Sync>> {
+  fn scan(template: &str) -> Vec<Finding> {
     let source = format!("<template>\n{template}\n</template>");
     let mut ctx = ScanContext::new("test.vue".into(), source);
     parse_sfc(&mut ctx);

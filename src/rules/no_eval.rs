@@ -6,7 +6,7 @@ use thiserror::Error;
 use crate::context::ScanContext;
 use crate::parser::script::{find_calls, is_call_named, parse_script};
 use crate::rule_id::RuleId;
-use crate::rules::{Category, Rule};
+use crate::rules::{Category, Finding, Rule};
 use crate::severity::Severity;
 
 #[derive(Error, Diagnostic, Debug)]
@@ -50,7 +50,7 @@ impl Rule for NoEval {
     Category::Security
   }
 
-  fn check(&self, ctx: &ScanContext) -> Vec<Box<dyn Diagnostic + Send + Sync>> {
+  fn check(&self, ctx: &ScanContext) -> Vec<Finding> {
     let mut violations = Vec::new();
     let Some(script) = ctx.script.as_ref() else {
       return violations;
@@ -70,10 +70,10 @@ impl Rule for NoEval {
 
     for m in matches {
       let absolute = (ctx.script_offset as u32 + m.call.start) as usize;
-      violations.push(Box::new(NoEvalViolation {
+      violations.push(Finding::new(Box::new(NoEvalViolation {
         src: ctx.named_source.clone(),
         span: SourceSpan::new(absolute.into(), m.call.len() as usize),
-      }));
+      })));
     }
 
     // `new Function(...)` is a `NewExpression`, not a `CallExpression`, so
@@ -91,7 +91,7 @@ impl Rule for NoEval {
 }
 
 struct NewFunctionFinder<'a, 'b> {
-  hits: &'a mut Vec<Box<dyn Diagnostic + Send + Sync>>,
+  hits: &'a mut Vec<Finding>,
   named_source: &'b NamedSource<String>,
   script_offset: usize,
 }
@@ -101,10 +101,10 @@ impl<'a, 'b, 'c> Visit<'c> for NewFunctionFinder<'a, 'b> {
     if is_new_function(expr) {
       let span = expr.span;
       let absolute = (self.script_offset as u32 + span.start) as usize;
-      self.hits.push(Box::new(NoEvalViolation {
+      self.hits.push(Finding::new(Box::new(NoEvalViolation {
         src: self.named_source.clone(),
         span: SourceSpan::new(absolute.into(), (span.end - span.start) as usize),
-      }));
+      })));
     }
     self.visit_expression(&expr.callee);
     self.visit_arguments(&expr.arguments);
@@ -140,7 +140,7 @@ mod tests {
   use super::*;
   use crate::parser::parse_sfc;
 
-  fn scan(source: &str) -> Vec<Box<dyn Diagnostic + Send + Sync>> {
+  fn scan(source: &str) -> Vec<Finding> {
     let mut ctx = ScanContext::new("test.vue".into(), source.to_string());
     parse_sfc(&mut ctx);
     NoEval.check(&ctx)
