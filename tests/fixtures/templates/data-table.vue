@@ -1,0 +1,39 @@
+<template>
+  <Suspense>
+    <Teleport to="body">
+      <Transition name="fade" mode="out-in">
+        <div v-if="loading" class="overlay" aria-busy="true">Loading…</div>
+      </Transition>
+    </Teleport>
+
+    <section class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th v-for="col in columns" :key="col.key">{{ col.label }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="row in rows" :key="row.id" @click="select(row)">
+            <td v-for="col in columns" :key="col.key">{{ row[col.key] }}</td>
+          </tr>
+          <template v-if="rows.length === 0">
+            <tr>
+              <td colspan="999" class="empty">No rows</td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+
+      <component :is="paginationComponent" :page="page" @change="onPageChange" />
+    </section>
+  </Suspense>
+</template>
+
+<script setup>
+import { ref } from 'vue';
+
+const columns = ref([]);
+const rows = ref([]);
+const page = ref(1);
+</script>
