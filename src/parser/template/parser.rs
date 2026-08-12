@@ -42,6 +42,12 @@ pub struct TemplateError {
   pub span: Span,
 }
 
+impl std::fmt::Display for TemplateError {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "{}", self.message)
+  }
+}
+
 impl<'a> TemplateParser<'a> {
   #[must_use]
   pub fn new(source: &'a str, base: u32) -> Self {

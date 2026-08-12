@@ -19,6 +19,7 @@ fn scan_with_options(name: &str, options: &ScanOptions) -> Vec<vuer::scanner::Vi
   scanner
     .scan_file(&fixture(name), &[], options)
     .expect("scan should succeed")
+    .violations
 }
 
 fn rule_ids(violations: &[vuer::scanner::Violation]) -> Vec<&str> {
@@ -615,6 +616,51 @@ fn no_config_flag_skips_discovery() {
     .count();
   assert_eq!(with_v_html, 0, "config should disable no-v-html");
   assert!(without_v_html > 0, "--no-config should re-enable no-v-html");
+}
+
+// ---------------------------------------------------------------------
+// Template parse errors (Phase 1): a malformed template degrades to
+// "needs review" — the CLI must warn and fail under --deny-warnings
+// instead of silently reporting a clean file.
+// ---------------------------------------------------------------------
+
+#[test]
+fn scanner_reports_parse_issues() {
+  let scanner = Scanner::new();
+  let report = scanner
+    .scan_file(&fixture("malformed.vue"), &[], &ScanOptions::default())
+    .expect("scan should succeed");
+  assert_eq!(report.parse_issues.len(), 1);
+  let issue = &report.parse_issues[0];
+  assert!(!issue.errors.is_empty(), "expected template parse errors");
+}
+
+#[test]
+fn binary_warns_on_malformed_template() {
+  use crate::common::Vuer;
+  let out = Vuer::new().input(fixture("malformed.vue")).run();
+  assert!(out.success(), "vuer should not crash on a malformed template");
+  assert!(
+    out.stderr.contains("template parse error"),
+    "stderr should warn about the parse error: {}",
+    out.stderr
+  );
+  assert!(
+    out.stderr.contains("had template parse errors"),
+    "stderr should count the malformed files: {}",
+    out.stderr
+  );
+}
+
+#[test]
+fn binary_deny_warnings_fails_on_malformed_template() {
+  use crate::common::Vuer;
+  let out = Vuer::new()
+    .input(fixture("malformed.vue"))
+    .deny_warnings()
+    .expect_failure(1)
+    .run();
+  assert_eq!(out.status.code(), Some(1));
 }
 
 fn make_temp_dir(label: &str) -> PathBuf {

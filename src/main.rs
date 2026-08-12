@@ -297,6 +297,7 @@ fn main() {
   };
   let mut has_errors = false;
   let mut all_violations: Vec<vuer::scanner::Violation> = Vec::new();
+  let mut all_parse_issues: Vec<vuer::scanner::ParseIssue> = Vec::new();
 
   for path in &cli.paths {
     if !path.exists() {
@@ -306,8 +307,9 @@ fn main() {
     }
 
     match scanner.scan_path(path, &enabled_rules, &options) {
-      Ok(violations) => {
-        all_violations.extend(violations);
+      Ok(report) => {
+        all_violations.extend(report.violations);
+        all_parse_issues.extend(report.parse_issues);
       }
       Err(e) => {
         eprintln!("Error scanning {}: {}", path.display(), e);
@@ -354,13 +356,46 @@ fn main() {
     OutputFormat::Sarif => print_sarif(&all_violations),
     OutputFormat::Minimal => print_minimal(&all_violations),
   }
+
+  // Template parse failures degrade a file to "needs review", never to
+  // "this file is clean". Warn on stderr (machine formats on stdout stay
+  // parseable) and count the affected files in the summary.
+  if !all_parse_issues.is_empty() {
+    for issue in &all_parse_issues {
+      for err in &issue.errors {
+        eprintln!(
+          "{} {}: {}",
+          "warning:".yellow().bold(),
+          "template parse error".yellow(),
+          format!(
+            "{} (byte {}) — {}",
+            issue.file.display(),
+            err.span.start,
+            err.message
+          )
+          .yellow()
+        );
+      }
+    }
+    eprintln!(
+      "{} {}",
+      "warning:".yellow().bold(),
+      format!(
+        "{} file(s) had template parse errors; findings for those files may be incomplete",
+        all_parse_issues.len()
+      )
+      .yellow()
+    );
+  }
+
   let total_violations = all_violations.len();
   let ignored_count = all_violations.iter().filter(|v| v.ignored).count();
 
   // `deny_warnings` should never cause a clean run to fail, so a violation
-  // suppressed by `// vuer-ignore` is not a real warning.
+  // suppressed by `// vuer-ignore` is not a real warning. A file that did
+  // not parse cleanly is a warning too: it needs review.
   let actionable_violations = total_violations - ignored_count;
-  if cli.deny_warnings && actionable_violations > 0 {
+  if cli.deny_warnings && (actionable_violations > 0 || !all_parse_issues.is_empty()) {
     process::exit(1);
   }
 
