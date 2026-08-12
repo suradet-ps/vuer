@@ -639,7 +639,10 @@ fn scanner_reports_parse_issues() {
 fn binary_warns_on_malformed_template() {
   use crate::common::Vuer;
   let out = Vuer::new().input(fixture("malformed.vue")).run();
-  assert!(out.success(), "vuer should not crash on a malformed template");
+  assert!(
+    out.success(),
+    "vuer should not crash on a malformed template"
+  );
   assert!(
     out.stderr.contains("template parse error"),
     "stderr should warn about the parse error: {}",
