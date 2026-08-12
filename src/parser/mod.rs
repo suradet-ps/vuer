@@ -150,6 +150,9 @@ pub fn parse_sfc(ctx: &mut ScanContext) {
   for block in style_blocks {
     ctx.style_blocks.push(block.content.to_string());
   }
+
+  // Phase 2: one taint pass per file, so every rule sees the same facts.
+  ctx.taint = crate::taint::analyze(ctx);
 }
 
 /// Find a top-level `<template>` / `<script>` / `<style>` opener at `lt`
