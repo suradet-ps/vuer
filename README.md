@@ -28,6 +28,14 @@ rule against the resulting AST.
   `watch` callbacks that may leak.
 - **Severity model**: `Critical` / `High` / `Medium` / `Low` / `Info`,
   with a clean SARIF mapping.
+- **Taint analysis**: a single-pass intra-file taint engine (Phase 2)
+  tracks untrusted data from sources (`localStorage`, `fetch`,
+  `useRoute`, `defineProps` props, `event`, ...) through propagation
+  to sinks (`v-html`, `.innerHTML`, dynamic `:src`, `location`
+  writes). Taint-aware rules report *flows* — `taint from
+  localStorage.getItem (line 2) reaches `v-html` binding via
+  userInput` — and stay silent on provably clean bindings, cutting
+  false positives without losing the unsafe path.
 - **Output formats**: pretty, JSON, minimal, **SARIF 2.1.0**
   (GitHub Code Scanning / GitLab Security Reports ready).
 - **Category and severity filters** to scope runs to one area or to
@@ -223,15 +231,15 @@ Full reference documentation lives under `docs/`:
 
 | Rule id | Severity | Category | Description |
 |---------|----------|----------|-------------|
-| `vue/security/no-v-html` | Critical | security | Disallow `v-html` directive |
-| `vue/security/no-inner-html` | Critical | security | Disallow `el.innerHTML = ...` |
+| `vue/security/no-v-html` | Critical | security | Disallow `v-html` when the binding may carry untrusted data |
+| `vue/security/no-inner-html` | Critical | security | Disallow `el.innerHTML = ...` when the value may be untrusted |
 | `vue/security/no-document-write` | High | security | Disallow `document.write` / `writeln` |
 | `vue/security/no-eval` | Critical | security | Disallow `eval`, `new Function`, string `setTimeout` |
 | `vue/security/no-dangerous-url` | Critical | security | Disallow `javascript:` / `data:text/html` / `vbscript:` URLs |
-| `vue/security/no-open-redirect` | High | security | Disallow `location.*` writes to dynamic values |
+| `vue/security/no-open-redirect` | High | security | Disallow `location.*` writes of untrusted values |
 | `vue/security/no-unsafe-localstorage` | High | security | Disallow auth-looking values in `localStorage` |
 | `vue/security/no-unsafe-iframe` | Medium | security | Disallow `<iframe>` without `sandbox` |
-| `vue/security/no-dynamic-bind-src` | High | security | Disallow dynamic `:src` bindings |
+| `vue/security/no-dynamic-bind-src` | High | security | Disallow `:src` bindings of untrusted values |
 | `vue/security/no-postmessage-wildcard` | High | security | Disallow `postMessage(..., '*')` |
 | `vue/security/no-window-open-blank-noopener` | High | security | Require `noopener` on `window.open(..., '_blank', ...)` |
 | `vue/security/no-fetch-without-timeout` | High | security | Require an `AbortSignal` on `fetch` |
@@ -260,6 +268,10 @@ SFC extraction (template / script / style)
 
 Key design decisions:
 
+- **Taint-aware, not just syntactic.** After parsing, one taint pass
+  annotates every expression in the file (script + template bindings);
+  rules that query it report "this pattern carries untrusted data" with
+  a source→sink flow instead of just "this pattern exists".
 - **No regex in any rule.** The only place strings are read is the SFC
   block extractor; from then on everything is structural.
 - **No `unwrap()`, `expect()`, or `panic!()` in production code.** Errors
