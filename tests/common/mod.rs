@@ -1,6 +1,11 @@
 //! Shared helpers for the template-parser test suites (conformance,
 //! edge cases, offset integrity). Each test file in `tests/` is its own
 //! crate; this module is compiled into each of them via `mod common;`.
+//!
+//! `dead_code` is allowed at crate level: every suite uses only part of
+//! the helpers, and each per-suite compilation would otherwise warn.
+
+#![allow(dead_code)]
 
 use std::path::PathBuf;
 
