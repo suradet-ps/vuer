@@ -5,7 +5,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onUnmounted } from 'vue'
+import { ref } from 'vue'
 
 const trustedContent = ref('<span>Safe</span>')
 </script>

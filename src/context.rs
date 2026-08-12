@@ -2,6 +2,7 @@ use miette::NamedSource;
 use std::path::PathBuf;
 
 use crate::parser::template::{TemplateError, TemplateRoot};
+use crate::taint::TaintResult;
 
 #[derive(Debug, Clone)]
 pub struct ScanContext {
@@ -25,6 +26,10 @@ pub struct ScanContext {
   /// itself is out of scope for v1 (see README); the blocks are extracted
   /// so future rules can inspect them without re-reading the source.
   pub style_blocks: Vec<String>,
+  /// Per-expression taint facts, computed once per file at the end of
+  /// `parse_sfc`. Rules query [`TaintResult::status_at`] /
+  /// [`TaintResult::flow_at`]; an empty result means "nothing analysed".
+  pub taint: TaintResult,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -49,6 +54,7 @@ impl ScanContext {
       template_ast: None,
       template_errors: Vec::new(),
       style_blocks: Vec::new(),
+      taint: TaintResult::default(),
     }
   }
 }

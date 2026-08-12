@@ -58,6 +58,9 @@ pub struct Violation {
   /// True when the violation sits under a `// vuer-ignore[...]` (or HTML
   /// equivalent) comment and `--no-ignores` is not set.
   pub ignored: bool,
+  /// Taint flow paths reaching this finding, when the rule ran taint
+  /// analysis.
+  pub flow: Option<Vec<crate::taint::FlowPath>>,
 }
 
 impl Violation {
@@ -158,15 +161,15 @@ impl Scanner {
     let mut violations = Vec::new();
 
     for rule in &rules {
-      for diagnostic in rule.check(&ctx) {
-        let (offset, length) = primary_span(diagnostic.as_ref());
+      for finding in rule.check(&ctx) {
+        let (offset, length) = primary_span(finding.diagnostic.as_ref());
         let rule_name = rule.name().to_string();
         let rule_id = rule.id().as_str().to_string();
         let ignored =
           !options.no_ignores && violation_is_ignored(&ctx.source, offset, &rule_name, &rule_id);
         violations.push(Violation {
           file: path.to_path_buf(),
-          diagnostic,
+          diagnostic: finding.diagnostic,
           rule_name,
           rule_id,
           severity: rule.severity(),
@@ -174,6 +177,7 @@ impl Scanner {
           span_offset: offset,
           span_length: length,
           ignored,
+          flow: finding.flow,
         });
       }
     }

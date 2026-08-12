@@ -28,6 +28,46 @@ contexts.
 
 ---
 
+## Taint analysis (Phase 2)
+
+Four rules — `no-v-html`, `no-inner-html`, `no-dynamic-bind-src`, and
+`no-open-redirect` — do not merely match a pattern; they ask whether the
+matched pattern *carries untrusted data*. A single-pass taint engine runs
+once per file (at parse time) and annotates every expression with one of:
+
+* **Tainted** — the value flows from a recognised source: `localStorage` /
+  `sessionStorage` reads, `fetch` / `axios` / `useFetch` responses,
+  `useRoute()` / `$route` params and query, `defineProps` props, `event` /
+  `$event` payloads, `window.location`, `location.search`/`hash`,
+  `document.cookie` / `document.referrer`, `document.*` DOM reads,
+  `new FormData()` / `URLSearchParams`.
+* **Clean** — a literal, or a value derived only from clean data
+  (including values passed through a recognised sanitizer:
+  `DOMPurify.sanitize`, `sanitize`, `escapeHtml`, `htmlEscape`, `escape`,
+  `xss`).
+* **Unknown** — the expression could not be analysed (e.g. an unparseable
+  template binding); sink rules report these conservatively.
+
+Taint propagates through assignments, concatenation, template literals,
+ternaries, member writes/reads, destructuring, `.map`/`.filter`/`.then`
+callbacks, `ref`/`reactive`/`computed` wrappers, and bounded
+inter-procedural flow through local function calls. A call to an
+*unknown* function never taints its result (it could be a sanitizer) —
+cross-file flow through imports/composables is deferred to Phase 6.
+
+When a tainted value reaches a sink, the diagnostic carries the flow:
+
+```text
+error[vue/security/no-v-html]: Unsafe `v-html` directive renders untrusted HTML
+  = note: taint from localStorage.getItem (line 12) reaches `v-html` binding via userInput
+```
+
+This is what turns "this pattern exists" into "this pattern carries
+untrusted data": clean bindings are no longer reported (the
+false-positive cut), while the unsafe path is always reported.
+
+---
+
 ## `vue/security/no-v-html`
 
 | Field | Value |
@@ -47,13 +87,30 @@ written by `v-html` is treated as trusted.
 ### Vulnerable
 
 ```vue
+<script setup>
+const userInput = localStorage.getItem('draft')
+</script>
+
 <template>
   <div v-html="userInput"></div>
 </template>
 ```
 
-`userInput` is attacker-controlled; the rendered HTML runs in your
-origin.
+`userInput` flows from `localStorage` (untrusted) into the `v-html`
+binding. The diagnostic reports the flow:
+``taint from localStorage.getItem (line 2) reaches `v-html` binding via userInput``.
+
+### Not reported (the false-positive cut)
+
+Since v0.2 the rule only fires on bindings that may carry untrusted
+data. These are **not** reported:
+
+```vue
+<template>
+  <div v-html="'<b>static</b>'"></div>   <!-- literal -->
+  <div v-html="safe"></div>              <!-- sanitized: DOMPurify.sanitize(...) -->
+</template>
+```
 
 ### Safe
 
@@ -167,8 +224,14 @@ setTimeout(() => run(value), 100)
 
 `javascript:`, `data:text/html`, and `vbscript:` URLs execute
 script content in the navigation target's origin when followed.
-Only string literals are flagged — dynamic bindings require
-data-flow analysis that the linter does not perform.
+This rule is intentionally **syntactic** (it checks the URL scheme
+of the literal/binding text, not data flow): the dangerous pattern
+here *is* the scheme itself, so the taint-gating that Phase 2
+applies to `no-v-html` / `no-inner-html` / `no-dynamic-bind-src` /
+`no-open-redirect` would be wrong — a `javascript:` URL is dangerous
+whether its source is trusted or not. Dynamic untrusted *URLs* are
+covered by `no-open-redirect` (navigation) and `no-dynamic-bind-src`
+(resource loading).
 
 ### Vulnerable
 
@@ -238,8 +301,10 @@ document.body.appendChild(heading)
 | Introduced in | v0.1.0 |
 
 Writes to `location.href`, `window.location`, `window.location.href`,
-or calls to `location.assign` / `location.replace` with a
-non-literal argument are a classic open-redirect vector: an attacker
+or calls to `location.assign` / `location.replace` with a value that
+may carry untrusted data (see
+[Taint analysis](#taint-analysis-phase-2)) are a classic open-redirect
+vector: an attacker
 tricks the victim into clicking a link to your site, the script
 copies the `?next=` query parameter into a navigation, and the
 victim ends up on a phishing page that still appears to come from
@@ -328,9 +393,10 @@ an `<img>`, a malicious value can still leak cookies, exfiltrate
 referrer information, or perform SSRF against internal hosts when
 the same pattern is reused for `<iframe>` or `<script>`.
 
-The rule does **not** flag `:src` bound to a static-import value
-(e.g. `import logo from './logo.svg'`), since the bundler controls
-the URL.
+Since v0.2 the rule only fires when the bound value may carry
+untrusted data (see [Taint analysis](#taint-analysis-phase-2));
+constant or static-import values (`import logo from './logo.svg'`)
+are not reported.
 
 ### Vulnerable
 

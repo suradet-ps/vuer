@@ -37,7 +37,7 @@ use thiserror::Error;
 use crate::context::ScanContext;
 use crate::parser::script::{callee_path, parse_script};
 use crate::rule_id::RuleId;
-use crate::rules::{Category, Rule};
+use crate::rules::{Category, Finding, Rule};
 use crate::severity::Severity;
 
 #[derive(Error, Diagnostic, Debug)]
@@ -83,7 +83,7 @@ impl Rule for NoFetchWithoutTimeout {
     Category::Security
   }
 
-  fn check(&self, ctx: &ScanContext) -> Vec<Box<dyn Diagnostic + Send + Sync>> {
+  fn check(&self, ctx: &ScanContext) -> Vec<Finding> {
     let mut violations = Vec::new();
     let Some(script) = ctx.script.as_ref() else {
       return violations;
@@ -102,7 +102,7 @@ impl Rule for NoFetchWithoutTimeout {
 }
 
 struct FetchWithoutTimeoutFinder<'a, 'b> {
-  hits: &'a mut Vec<Box<dyn Diagnostic + Send + Sync>>,
+  hits: &'a mut Vec<Finding>,
   named_source: &'b NamedSource<String>,
   script_offset: usize,
 }
@@ -112,10 +112,12 @@ impl<'a, 'b, 'c> Visit<'c> for FetchWithoutTimeoutFinder<'a, 'b> {
     if is_fetch_call(call) && is_missing_signal(call) {
       let span = call.span;
       let absolute = (self.script_offset as u32 + span.start) as usize;
-      self.hits.push(Box::new(NoFetchWithoutTimeoutViolation {
-        src: self.named_source.clone(),
-        span: SourceSpan::new(absolute.into(), (span.end - span.start) as usize),
-      }));
+      self
+        .hits
+        .push(Finding::new(Box::new(NoFetchWithoutTimeoutViolation {
+          src: self.named_source.clone(),
+          span: SourceSpan::new(absolute.into(), (span.end - span.start) as usize),
+        })));
     }
     self.visit_arguments(&call.arguments);
     self.visit_expression(&call.callee);
@@ -160,7 +162,7 @@ mod tests {
   use super::*;
   use crate::parser::parse_sfc;
 
-  fn scan(source: &str) -> Vec<Box<dyn Diagnostic + Send + Sync>> {
+  fn scan(source: &str) -> Vec<Finding> {
     let mut ctx = ScanContext::new("test.vue".into(), source.to_string());
     parse_sfc(&mut ctx);
     NoFetchWithoutTimeout.check(&ctx)

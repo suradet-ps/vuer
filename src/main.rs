@@ -102,10 +102,11 @@ fn list_rules(registry: &RuleRegistry) {
   println!("Available rules:\n");
   for rule in registry.get_all() {
     println!(
-      "  {:<40} [{:<7}] {:<5} {}",
+      "  {:<40} [{:<7}] {:<5} {:<9} {}",
       rule.id().as_str(),
       format!("{:?}", rule.category()).to_lowercase(),
       format!("{:?}", rule.severity()).to_lowercase(),
+      format!("{:?}", rule.kind()).to_lowercase(),
       rule.description()
     );
   }
@@ -167,6 +168,19 @@ fn print_pretty(violations: &[vuer::scanner::Violation]) {
         group = group.element(Level::HELP.message(help.to_string()));
       }
 
+      if let Some(flows) = &v.flow {
+        for flow in flows {
+          let mut note = format!("taint from {} reaches {}", flow.source, flow.sink);
+          if !flow.via.is_empty() {
+            note.push_str(&format!(" via {}", flow.via.join(", ")));
+          }
+          if let Some(san) = &flow.sanitizer_note {
+            note.push_str(&format!("; {san}"));
+          }
+          group = group.element(Level::NOTE.message(note));
+        }
+      }
+
       eprintln!("{}", renderer.render(&[group]).to_string());
     }
   }
@@ -184,6 +198,9 @@ struct JsonViolation<'a> {
   byte_offset: usize,
   byte_length: usize,
   ignored: bool,
+  /// Taint flow paths when the rule ran taint analysis (Phase 2).
+  #[serde(skip_serializing_if = "Option::is_none")]
+  flow: Option<Vec<vuer::taint::FlowPath>>,
 }
 
 fn print_json(violations: &[vuer::scanner::Violation]) {
@@ -206,6 +223,7 @@ fn print_json(violations: &[vuer::scanner::Violation]) {
       byte_offset: v.span_offset(),
       byte_length: v.span_len(),
       ignored: v.ignored,
+      flow: v.flow.clone(),
     })
     .collect();
   println!("{}", serde_json::to_string_pretty(&json).unwrap());

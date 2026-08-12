@@ -38,7 +38,7 @@ expression: json
   },
   {
     "byte_length": 69,
-    "byte_offset": 292,
+    "byte_offset": 386,
     "category": "bestpractice",
 <FIXTURE>/vulnerable.vue",
     "ignored": false,

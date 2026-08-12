@@ -4,6 +4,7 @@ use thiserror::Error;
 use crate::context::ScanContext;
 use crate::rule_id::RuleId;
 use crate::severity::Severity;
+use crate::taint::FlowPath;
 
 pub mod no_dangerous_url;
 pub mod no_document_write;
@@ -20,6 +21,44 @@ pub mod no_v_html;
 pub mod no_watch_with_callback;
 pub mod no_window_open_blank_noopener;
 pub mod v_for_missing_key;
+
+/// How a rule reasons about its findings.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RuleKind {
+  /// The rule matches a syntactic pattern ("this pattern exists").
+  Syntactic,
+  /// The rule additionally asks the taint engine whether the matched
+  /// pattern carries untrusted data ("this pattern carries untrusted
+  /// data"), cutting false positives while keeping the unsafe path.
+  Taint,
+}
+
+/// One rule finding: the diagnostic plus optional taint flow paths.
+///
+/// Rules that did not run taint analysis return `flow: None`; the report
+/// layer consumes the field only when present.
+pub struct Finding {
+  pub diagnostic: Box<dyn Diagnostic + Send + Sync>,
+  /// Untrusted-data flow(s) reaching this finding, when the rule queried
+  /// the taint engine.
+  pub flow: Option<Vec<FlowPath>>,
+}
+
+impl Finding {
+  pub fn new(diagnostic: Box<dyn Diagnostic + Send + Sync>) -> Self {
+    Self {
+      diagnostic,
+      flow: None,
+    }
+  }
+
+  pub fn with_flow(diagnostic: Box<dyn Diagnostic + Send + Sync>, flow: Vec<FlowPath>) -> Self {
+    Self {
+      diagnostic,
+      flow: Some(flow),
+    }
+  }
+}
 
 /// A category groups rules so that the user can opt in or out of whole areas
 /// of analysis with a single flag (e.g. `--category security`).
@@ -73,13 +112,19 @@ pub trait Rule: Send + Sync {
   /// Which category this rule belongs to.
   fn category(&self) -> Category;
 
+  /// How the rule reasons about findings. Defaults to [`RuleKind::Syntactic`];
+  /// rules upgraded to query the taint engine override it.
+  fn kind(&self) -> RuleKind {
+    RuleKind::Syntactic
+  }
+
   /// The actual analysis. Receives an immutable `ScanContext` and returns
-  /// zero or more diagnostics.
+  /// zero or more findings (diagnostic + optional taint flows).
   ///
   /// The `Send + Sync` bound on the returned diagnostics lets the
   /// scanner parallelise per-file work across rayon workers (see
   /// `scanner::Scanner::scan_path`).
-  fn check(&self, ctx: &ScanContext) -> Vec<Box<dyn Diagnostic + Send + Sync>>;
+  fn check(&self, ctx: &ScanContext) -> Vec<Finding>;
 }
 
 pub struct RuleRegistry {
