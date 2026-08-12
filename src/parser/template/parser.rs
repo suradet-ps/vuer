@@ -11,9 +11,9 @@
 //! 2. No string-searching. Detection of `v-html`, `:src`, etc. is structural.
 //! 3. Errors are recovered when possible so that one bad node does not blank the
 //!    rest of the template.
-//! 4. No `unwrap()`/`panic!()` outside `#[cfg(test)]`. Malformed input is a typed
-//!    [`TemplateError`], never a crash, and every recovery path is guaranteed to
-//!    make progress so the parser always terminates.
+//! 4. Panic-free in production: malformed input is a typed
+//!    [`TemplateError`], never a crash, and every recovery path is
+//!    guaranteed to make progress so the parser always terminates.
 
 use oxc_span::Span;
 
