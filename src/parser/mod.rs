@@ -7,8 +7,27 @@
 //!   * `script`   -> deferred to the rule (it can call `oxc_parser` directly when
 //!     it needs the JS/TS AST).
 //!
-//! The block boundaries are detected by a character-based scanner that tracks
-//! the byte offset of every block, so spans line up with the original file.
+//! The block extractor is a single-pass, nesting-aware scanner. It tracks
+//! the byte offset of every block so spans line up with the original file,
+//! and it knows about the constructs that would otherwise confuse a naive
+//! `find("</template>")` search:
+//!
+//!   * a `<template v-if="...">` element *inside* the template block
+//!     (fragments, `<template v-for>`) — nesting of same-name tags is
+//!     counted, so the block ends at the *matching* `</template>`;
+//!   * `<script>` / `<style>` elements inside the template block — they
+//!     are skipped as content, never mistaken for SFC blocks;
+//!   * comments (`<!-- ... -->`) whose text contains a `</template>`-like
+//!     string — they are skipped whole;
+//!   * self-closing `<template/>` elements, which add no nesting depth.
+//!
+//! Known limitation (documented, tracked for Phase 8 fuzzing): a `>` or a
+//! `</template>`-shaped string inside a *quoted attribute value* of a
+//! template-level tag is still matched naively. The template parser that
+//! runs afterwards re-reads the content properly; only the boundary can be
+//! slightly off in that corner case.
+
+use oxc_span::Span;
 
 use crate::context::{ScanContext, ScriptLang};
 use crate::parser::template::{TemplateError, TemplateRoot};
@@ -33,13 +52,86 @@ struct BlockMatch<'a> {
   content_offset: usize,
   /// The trimmed content of the block.
   content: &'a str,
-  /// Offset just past the block's closing tag, so the caller can search
-  /// for the next block of the same kind.
-  close_offset: usize,
 }
 
 pub fn parse_sfc(ctx: &mut ScanContext) {
-  if let Some(block) = find_block(&ctx.source, BlockKind::Template, 0) {
+  let source = &ctx.source;
+  let mut template_block: Option<BlockMatch> = None;
+  let mut script_block: Option<BlockMatch> = None;
+  let mut style_blocks: Vec<BlockMatch> = Vec::new();
+
+  let mut cursor = 0;
+  while cursor < source.len() {
+    let Some(lt) = source[cursor..].find('<') else {
+      break;
+    };
+    let lt = cursor + lt;
+    if source[lt..].starts_with("<!--") {
+      cursor = skip_comment(source, lt);
+      continue;
+    }
+    let Some((kind, open_end)) = match_block_opener(source, lt) else {
+      cursor = skip_tag(source, lt);
+      continue;
+    };
+
+    let name_end = lt + 1 + kind_tag(kind).len();
+    let attrs = &source[name_end..open_end];
+    let content_start = open_end + 1;
+
+    let block = match scan_block_end(source, content_start, kind) {
+      Some(close_start) => {
+        let raw = &source[content_start..close_start];
+        let trimmed = raw.trim_start();
+        let content_offset = content_start + (raw.len() - trimmed.len());
+        let content = raw.trim();
+        cursor = close_tag_end(source, close_start, kind);
+        BlockMatch {
+          attrs,
+          content_offset,
+          content,
+        }
+      }
+      None => {
+        // Unterminated block. Parse whatever content exists so rules can
+        // still see a partial tree, and record a `TemplateError` so the
+        // file degrades to "needs review" instead of "clean".
+        if kind == BlockKind::Template {
+          let raw = &source[content_start..];
+          let trimmed = raw.trim_start();
+          let content_offset = content_start + (raw.len() - trimmed.len());
+          let content = raw.trim();
+          if !content.is_empty() {
+            let (root, mut errors) = template::parse_template(content, content_offset as u32);
+            ctx.template = Some(content.to_string());
+            ctx.template_ast = Some(root);
+            ctx.template_errors.append(&mut errors);
+          }
+          ctx.template_errors.push(TemplateError {
+            message: "Unterminated <template> block",
+            span: Span::new(lt as u32, open_end as u32),
+          });
+        }
+        break;
+      }
+    };
+
+    match kind {
+      BlockKind::Template => {
+        if template_block.is_none() {
+          template_block = Some(block);
+        }
+      }
+      BlockKind::Script => {
+        if script_block.is_none() {
+          script_block = Some(block);
+        }
+      }
+      BlockKind::Style => style_blocks.push(block),
+    }
+  }
+
+  if let Some(block) = template_block {
     ctx.template_offset = block.content_offset;
     let (root, errors) = template::parse_template(block.content, block.content_offset as u32);
     ctx.template = Some(block.content.to_string());
@@ -47,7 +139,7 @@ pub fn parse_sfc(ctx: &mut ScanContext) {
     ctx.template_errors = errors;
   }
 
-  if let Some(block) = find_block(&ctx.source, BlockKind::Script, 0) {
+  if let Some(block) = script_block {
     ctx.lang = detect_lang(block.attrs);
     ctx.script_offset = block.content_offset;
     ctx.script = Some(block.content.to_string());
@@ -55,58 +147,124 @@ pub fn parse_sfc(ctx: &mut ScanContext) {
 
   // A `.vue` file may carry several `<style>` blocks (e.g. one plain and
   // one `scoped`); extract every one of them.
-  let mut search_from = 0;
-  while let Some(block) = find_block(&ctx.source, BlockKind::Style, search_from) {
+  for block in style_blocks {
     ctx.style_blocks.push(block.content.to_string());
-    search_from = block.close_offset;
   }
 }
 
-fn find_block<'a>(source: &'a str, kind: BlockKind, start: usize) -> Option<BlockMatch<'a>> {
-  let tag = kind_tag(kind);
-  let open_pat = format!("<{}", tag);
-  let close_pat = format!("</{}", tag);
-
-  // The SFC block extractor splits the file on `<template>` /
-  // `<script>` / `<style>` boundaries. It is a tiny scanner that runs
-  // once per file. We use byte-level substring search rather than
-  // building a full SFC parser because:
-  //   1. We are looking for *boundaries*, not parsing SFC structure.
-  //   2. The patterns are fixed and small.
-  // The blocks themselves are then handed to the proper AST parsers
-  // (template + script), which are full recursive-descent / oxc parsers.
-  let bytes = source.as_bytes();
-  let rel = find_subslice(&bytes[start..], open_pat.as_bytes())?;
-  let open_offset = start + rel;
-  let after_tag = open_offset + open_pat.len();
-  let attr_end = source[after_tag..].find('>')? + after_tag;
-  let attrs = &source[after_tag..attr_end];
-  let content_start = attr_end + 1;
-  let close_rel = source[content_start..].find(&close_pat)?;
-  let raw_content = &source[content_start..content_start + close_rel];
-  let trimmed_start = raw_content.len() - raw_content.trim_start().len();
-  let content_offset = content_start + trimmed_start;
-  let content = raw_content.trim();
-  Some(BlockMatch {
-    attrs,
-    content_offset,
-    content,
-    close_offset: content_start + close_rel + close_pat.len(),
-  })
-}
-
-fn find_subslice(haystack: &[u8], needle: &[u8]) -> Option<usize> {
-  if needle.is_empty() || needle.len() > haystack.len() {
-    return None;
-  }
-  let mut i = 0;
-  while i + needle.len() <= haystack.len() {
-    if &haystack[i..i + needle.len()] == needle {
-      return Some(i);
+/// Find a top-level `<template>` / `<script>` / `<style>` opener at `lt`
+/// and return its kind plus the offset of the `>` that ends the opening
+/// tag. `None` when `lt` is not the start of a block opener.
+fn match_block_opener(source: &str, lt: usize) -> Option<(BlockKind, usize)> {
+  for kind in [BlockKind::Template, BlockKind::Script, BlockKind::Style] {
+    let tag = kind_tag(kind);
+    let name_end = lt + 1 + tag.len();
+    if name_end > source.len() {
+      continue;
     }
-    i += 1;
+    if &source[lt + 1..name_end] != tag {
+      continue;
+    }
+    // The character after the name must terminate it: whitespace, `>`,
+    // or `/`. This rejects `<template-foo>` and `<templateX>`.
+    match source[name_end..].chars().next() {
+      Some(c) if !(c.is_whitespace() || c == '>' || c == '/') => continue,
+      None => continue,
+      Some(_) => {}
+    }
+    // The `>` that ends the opening tag. Naive: a `>` inside a quoted
+    // attribute value would end it early (documented limitation).
+    let rel = source[name_end..].find('>')?;
+    return Some((kind, name_end + rel));
   }
   None
+}
+
+/// Scan from `from` for the closing tag that terminates the block opened
+/// by a `<tag>` of `kind`, counting nested same-name elements and
+/// skipping comments. Returns the offset of the matching `</tag>`, or
+/// `None` when the block is unterminated.
+fn scan_block_end(source: &str, from: usize, kind: BlockKind) -> Option<usize> {
+  let tag = kind_tag(kind);
+  let open_pat = format!("<{tag}");
+  let close_pat = format!("</{tag}");
+  let mut depth = 1_u32;
+  let mut j = from;
+  while j < source.len() {
+    let rel = source[j..].find('<')?;
+    let lt = j + rel;
+    if source[lt..].starts_with("<!--") {
+      j = skip_comment(source, lt);
+      continue;
+    }
+    if is_tag(source, lt, &close_pat) {
+      depth -= 1;
+      if depth == 0 {
+        return Some(lt);
+      }
+      j = lt + close_pat.len();
+      continue;
+    }
+    if is_tag(source, lt, &open_pat) {
+      let after_name = lt + open_pat.len();
+      if !is_self_closing(source, after_name) {
+        depth += 1;
+      }
+      j = after_name;
+      continue;
+    }
+    j = skip_tag(source, lt);
+  }
+  None
+}
+
+/// True when `source[lt..]` starts with `pat` as a *complete* tag name
+/// (the next character does not extend the name).
+fn is_tag(source: &str, lt: usize, pat: &str) -> bool {
+  if !source[lt..].starts_with(pat) {
+    return false;
+  }
+  !matches!(
+    source[lt + pat.len()..].chars().next(),
+    Some(c) if c.is_ascii_alphanumeric() || c == '-' || c == '_'
+  )
+}
+
+/// True when the tag whose name ends at `from` is self-closing
+/// (`... />`).
+fn is_self_closing(source: &str, from: usize) -> bool {
+  let Some(rel) = source[from..].find('>') else {
+    return false;
+  };
+  source[from..from + rel].ends_with('/')
+}
+
+/// Offset just past the `>` of the closing `</tag ...>` at `close_start`.
+fn close_tag_end(source: &str, close_start: usize, kind: BlockKind) -> usize {
+  let after_name = close_start + 2 + kind_tag(kind).len();
+  match source[after_name..].find('>') {
+    Some(rel) => after_name + rel + 1,
+    None => source.len(),
+  }
+}
+
+/// Advance past an HTML comment starting at `lt` (`<!-- ... -->`).
+/// Unterminated comments consume the rest of the source.
+fn skip_comment(source: &str, lt: usize) -> usize {
+  match source[lt + 4..].find("-->") {
+    Some(rel) => lt + 4 + rel + 3,
+    None => source.len(),
+  }
+}
+
+/// Advance past the `>` that ends the tag starting at `lt`. Naive: a `>`
+/// inside a quoted attribute value ends the skip early (documented
+/// limitation of the boundary scanner).
+fn skip_tag(source: &str, lt: usize) -> usize {
+  match source[lt..].find('>') {
+    Some(rel) => lt + rel + 1,
+    None => source.len(),
+  }
 }
 
 fn kind_tag(kind: BlockKind) -> &'static str {
@@ -185,6 +343,88 @@ mod tests {
     // for a real style block when it appears after the template closed.
     let ctx = parse("<template><span>x</span></template>");
     assert!(ctx.style_blocks.is_empty());
+  }
+
+  #[test]
+  fn nested_template_elements_do_not_truncate_the_block() {
+    let ctx = parse(
+      "<template>\n\
+         <table>\n\
+           <template v-for=\"row in rows\">\n\
+             <tr><td>{{ row }}</td></tr>\n\
+           </template>\n\
+         </table>\n\
+       </template>\n\
+       <script>const x = 1;</script>",
+    );
+    let template = ctx.template.as_deref().expect("template block");
+    assert!(
+      template.contains("<table>") && template.contains("</table>"),
+      "nested <template> must not truncate the block: {template:?}"
+    );
+    assert!(
+      template.contains("</template>"),
+      "the nested element's own closing tag is part of the content: {template:?}"
+    );
+    assert_eq!(ctx.script.as_deref(), Some("const x = 1;"));
+  }
+
+  #[test]
+  fn script_element_inside_template_is_not_a_script_block() {
+    let ctx = parse(
+      "<template><script type=\"text/plain\">not real</script></template>\n\
+       <script>const real = true;</script>",
+    );
+    assert_eq!(ctx.script.as_deref(), Some("const real = true;"));
+    assert!(
+      ctx
+        .template
+        .as_deref()
+        .expect("template block")
+        .contains("not real")
+    );
+  }
+
+  #[test]
+  fn comment_containing_closing_tag_is_skipped() {
+    let ctx = parse(
+      "<template>\n\
+         <div></div>\n\
+         <!-- commented-out: </template> <template v-if=\"x\"> -->\n\
+       </template>",
+    );
+    assert_eq!(ctx.template_errors.len(), 0);
+    let template = ctx.template.as_deref().expect("template block");
+    assert!(template.contains("commented-out"));
+  }
+
+  #[test]
+  fn self_closing_template_element_adds_no_depth() {
+    let ctx = parse(
+      "<template>\n\
+         <div><template :is=\"x\"/></div>\n\
+       </template>",
+    );
+    assert!(
+      ctx.template_errors.is_empty(),
+      "errors: {:?}",
+      ctx.template_errors
+    );
+  }
+
+  #[test]
+  fn unterminated_template_block_degrades_to_needs_review() {
+    let ctx = parse("<template>\n  <div></div>\n  <span>");
+    assert!(
+      ctx
+        .template_errors
+        .iter()
+        .any(|e| e.message == "Unterminated <template> block"),
+      "errors: {:?}",
+      ctx.template_errors
+    );
+    // The partial content is still parsed so rules see most of the file.
+    assert!(ctx.template_ast.is_some());
   }
 
   #[test]
