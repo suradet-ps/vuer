@@ -8,9 +8,12 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useRoute } from 'vue-router'
 
-const userInput = ref('<b>Bold</b>')
-const imageUrl = ref('/logo.png')
+const route = useRoute()
+
+const userInput = ref(localStorage.getItem('userInput') ?? '')
+const imageUrl = ref(route.query.img)
 
 watch(count, (newVal) => {
   console.log('Count changed:', newVal)

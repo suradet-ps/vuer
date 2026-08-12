@@ -11,6 +11,7 @@ error[vue/security/no-v-html]: Unsafe `v-html` directive renders untrusted HTML
   |        ^^^^^^^^^^^^ here
   |
   = help: Rendering untrusted HTML can execute arbitrary JavaScript. Sanitise the input with DOMPurify (or an equivalent library), or use `v-text` / `{ }` interpolation instead.
+  = note: taint from localStorage.getItem (line 1) reaches `v-html` binding via raw
 error[vue/security/no-v-html]: Unsafe `v-html` directive renders untrusted HTML
 <FIXTURE>/with_ignores.vue:4:8
   |
@@ -18,6 +19,7 @@ error[vue/security/no-v-html]: Unsafe `v-html` directive renders untrusted HTML
   |        ^^^^^^^^^^^^^^^^ (ignored)
   |
   = help: Rendering untrusted HTML can execute arbitrary JavaScript. Sanitise the input with DOMPurify (or an equivalent library), or use `v-text` / `{ }` interpolation instead.
+  = note: taint from localStorage.getItem (line 1) reaches `v-html` binding via trusted
 error[vue/security/no-inner-html]: `.innerHTML` assignment introduces a DOM XSS sink
 <FIXTURE>/with_ignores.vue:11:1
    |
@@ -25,6 +27,7 @@ error[vue/security/no-inner-html]: `.innerHTML` assignment introduces a DOM XSS 
    | ^^^^^^^^^^^^^^^^^^ here
    |
    = help: Setting `.innerHTML` from a dynamic value lets an attacker inject script tags and event handlers. Use `textContent` for plain text, or sanitise the value with DOMPurify before insertion.
+   = note: taint from localStorage.getItem (line 1) reaches `.innerHTML` write via raw
 error[vue/security/no-inner-html]: `.innerHTML` assignment introduces a DOM XSS sink
 <FIXTURE>/with_ignores.vue:12:1
    |
@@ -32,5 +35,6 @@ error[vue/security/no-inner-html]: `.innerHTML` assignment introduces a DOM XSS 
    | ^^^^^^^^^^^^^^^^^^^^^^ (ignored)
    |
    = help: Setting `.innerHTML` from a dynamic value lets an attacker inject script tags and event handlers. Use `textContent` for plain text, or sanitise the value with DOMPurify before insertion.
+   = note: taint from localStorage.getItem (line 1) reaches `.innerHTML` write via trusted
 
 4 violations: 2 critical (2 ignored)

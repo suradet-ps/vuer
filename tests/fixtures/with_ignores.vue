@@ -5,8 +5,8 @@
 </template>
 
 <script setup lang="ts">
-const raw = '<b>x</b>'
-const trusted = 'safe'
+const raw = localStorage.getItem('raw')
+const trusted = localStorage.getItem('trusted')
 
 el.innerHTML = raw  // will be flagged (no ignore)
 el.innerHTML = trusted  // vuer-ignore[no-inner-html]

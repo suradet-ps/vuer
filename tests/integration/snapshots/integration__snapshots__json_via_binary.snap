@@ -13,7 +13,17 @@ expression: out.stdout
     "help": "Rendering untrusted HTML can execute arbitrary JavaScript. Sanitise the input with DOMPurify (or an equivalent library), or use `v-text` / `{ }` interpolation instead.",
     "byte_offset": 28,
     "byte_length": 18,
-    "ignored": false
+    "ignored": false,
+    "flow": [
+      {
+        "sink": "`v-html` binding",
+        "source": "localStorage.getItem (line 1)",
+        "via": [
+          "userInput"
+        ],
+        "sanitizer_note": null
+      }
+    ]
   },
   {
 <FIXTURE>/vulnerable.vue",
@@ -25,7 +35,17 @@ expression: out.stdout
     "help": "Validate and sanitise the URL before binding it. Allow only an explicit allow-list of schemes (https, /) and hosts, and never concatenate user input into the URL.",
     "byte_offset": 70,
     "byte_length": 15,
-    "ignored": false
+    "ignored": false,
+    "flow": [
+      {
+        "sink": "dynamic `src` binding",
+        "source": "useRoute (line 1)",
+        "via": [
+          "imageUrl"
+        ],
+        "sanitizer_note": null
+      }
+    ]
   },
   {
 <FIXTURE>/vulnerable.vue",
@@ -47,7 +67,7 @@ expression: out.stdout
     "category": "best-practice",
     "message": "`watch` with a callback can leak memory if not cleaned up",
     "help": "Prefer `watchEffect`, or make sure the watcher is stopped via the returned handle inside `onScopeDispose` / `onUnmounted`.",
-    "byte_offset": 292,
+    "byte_offset": 386,
     "byte_length": 69,
     "ignored": false
   }

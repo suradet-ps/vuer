@@ -47,12 +47,16 @@ fn clean_fixture_produces_no_violations() {
 }
 
 #[test]
-fn partial_fixture_is_clean() {
-  // The fixture intentionally uses v-html with a "trusted" variable name;
-  // the rule does not care about naming — it always flags v-html.
+fn partial_fixture_is_clean_for_v_html() {
+  // The fixture binds v-html to a constant literal. Under the Phase 2
+  // taint model that is provably clean data, so no-v-html stays silent —
+  // the false-positive cut working as designed.
   let violations = scan("partial.vue");
   let ids = rule_ids(&violations);
-  assert!(ids.contains(&"vue/security/no-v-html"), "ids: {ids:?}");
+  assert!(
+    !ids.contains(&"vue/security/no-v-html"),
+    "no-v-html must not fire on a literal binding, ids: {ids:?}"
+  );
 }
 
 #[test]

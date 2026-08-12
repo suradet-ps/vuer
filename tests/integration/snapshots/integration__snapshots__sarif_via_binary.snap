@@ -410,11 +410,11 @@ expression: out.stdout
                   "uriBaseId": "%SRCROOT%"
                 },
                 "region": {
-                  "startLine": 15,
+                  "startLine": 18,
                   "startColumn": 1,
-                  "endLine": 17,
+                  "endLine": 20,
                   "endColumn": 3,
-                  "byteOffset": 292,
+                  "byteOffset": 386,
                   "byteLength": 69
                 }
               }

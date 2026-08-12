@@ -10,11 +10,17 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useRoute } from 'vue-router'
 
-const userInput = ref('<b>x</b>')
-const redirect = ref('/home')
-const userAvatar = ref('/avatar.png')
+const route = useRoute()
+
+const userInput = ref(localStorage.getItem('u') ?? '')
+const redirect = ref(route.query.next)
+const userAvatar = ref(route.query.avatar)
 const items = ref([1, 2, 3])
+const input = route.query.q
+const next = route.query.next
+const jwt = route.query.token
 
 watch(userInput, (n) => { console.log(n) })
 

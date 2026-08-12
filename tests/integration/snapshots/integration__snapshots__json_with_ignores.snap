@@ -27,7 +27,7 @@ expression: json
   },
   {
     "byte_length": 18,
-    "byte_offset": 240,
+    "byte_offset": 282,
     "category": "security",
 <FIXTURE>/with_ignores.vue",
     "ignored": false,
@@ -38,7 +38,7 @@ expression: json
   },
   {
     "byte_length": 22,
-    "byte_offset": 291,
+    "byte_offset": 333,
     "category": "security",
 <FIXTURE>/with_ignores.vue",
     "ignored": true,
