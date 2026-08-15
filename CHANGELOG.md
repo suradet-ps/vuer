@@ -18,6 +18,17 @@ re-severed. Removing a rule is a major-version event announced here.
   attacker-influenced URL. A URL carrying untrusted data is still
   reported at High, with the source→sink flow path in the diagnostic.
   This closes the remaining `window.open` sink from the Phase 2 list.
+- **`oxc` bumped 0.136/0.143 → 0.144** — the whole cohort moves
+  together (parser, allocator, ast, ast_visit, span, syntax,
+  diagnostics), removing the mixed-generation lockfile. Breaking
+  changes absorbed: `Expression::MetaProperty` split into
+  `ImportMeta`/`NewTarget`, and `ArrowFunctionExpression.body` became
+  the `ArrowFunctionBody` enum (`FunctionBody` | inherited expression)
+  with `as_expression()` accessors. The conformance, edge-case,
+  offset-integrity, and snapshot suites pass with zero diffs.
+- **MSRV lowered 1.97 → 1.95** — `oxc` 0.144 requires rustc 1.95.0,
+  which is now the highest minimum in the dependency tree; CI pins
+  `dtolnay/rust-toolchain` 1.95.0 to match.
 
 ### Fixed
 

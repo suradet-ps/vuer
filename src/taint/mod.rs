@@ -408,7 +408,8 @@ impl<'a> Analyzer<'a> {
       | Expression::BigIntLiteral(_)
       | Expression::RegExpLiteral(_)
       | Expression::Super(_)
-      | Expression::MetaProperty(_)
+      | Expression::ImportMeta(_)
+      | Expression::NewTarget(_)
       | Expression::ThisExpression(_)
       | Expression::ClassExpression(_)
       | Expression::JSXElement(_)
@@ -1210,24 +1211,27 @@ impl<'a> Analyzer<'a> {
     f: &oxc_ast::ast::ArrowFunctionExpression<'_>,
     abs_base: u32,
   ) -> TaintInfo {
-    if f.expression {
-      if let Some(oxc_ast::ast::Statement::ExpressionStatement(s)) = f.body.statements.first() {
-        return self.classify_expr(&s.expression, abs_base);
-      }
-      return TaintInfo::clean();
-    }
-    let mut tainted: Option<TaintInfo> = None;
-    for stmt in &f.body.statements {
-      if let oxc_ast::ast::Statement::ReturnStatement(ret) = stmt
-        && let Some(arg) = &ret.argument
-      {
-        let info = self.classify_expr(arg, abs_base);
-        if tainted.is_none() && info.status == TaintStatus::Tainted {
-          tainted = Some(info);
+    use oxc_ast::ast::ArrowFunctionBody;
+    // Block-bodied arrow: the explicit `return <expr>` statements.
+    if let ArrowFunctionBody::FunctionBody(body) = &f.body {
+      let mut tainted: Option<TaintInfo> = None;
+      for stmt in &body.statements {
+        if let oxc_ast::ast::Statement::ReturnStatement(ret) = stmt
+          && let Some(arg) = &ret.argument
+        {
+          let info = self.classify_expr(arg, abs_base);
+          if tainted.is_none() && info.status == TaintStatus::Tainted {
+            tainted = Some(info);
+          }
         }
       }
+      return tainted.unwrap_or_else(TaintInfo::clean);
     }
-    tainted.unwrap_or_else(TaintInfo::clean)
+    // Expression-bodied arrow: the implicit return value.
+    match f.body.as_expression() {
+      Some(e) => self.classify_expr(e, abs_base),
+      None => TaintInfo::clean(),
+    }
   }
 
   fn classify_function_returns(&mut self, f: &Function<'_>) -> TaintInfo {
@@ -1479,17 +1483,15 @@ fn expression_references(expr: &Expression<'_>, name: &str) -> bool {
     Expression::SequenceExpression(s) => {
       s.expressions.iter().any(|e| expression_references(e, name))
     }
-    Expression::ArrowFunctionExpression(f) => f.body.statements.iter().any(|s| {
-      if f.expression {
-        matches!(
-          s,
-          oxc_ast::ast::Statement::ExpressionStatement(e)
-            if expression_references(&e.expression, name)
-        )
-      } else {
-        false
-      }
-    }),
+    Expression::ArrowFunctionExpression(f) => {
+      // Only the implicit return value of an expression-bodied arrow is
+      // a value reference; a block-bodied arrow's `return` statements
+      // are already covered by the return-statement classification.
+      matches!(
+        f.body.as_expression(),
+        Some(e) if expression_references(e, name)
+      )
+    }
     _ => false,
   }
 }
@@ -1525,12 +1527,11 @@ impl<'a> Visit<'a> for SummaryCollector<'a> {
         .flat_map(|p| pattern_names(&p.pattern))
         .collect();
       let mut returns: Vec<Span> = Vec::new();
-      if f.expression {
-        if let Some(oxc_ast::ast::Statement::ExpressionStatement(s)) = f.body.statements.first() {
-          returns.push(s.expression.span());
-        }
-      } else {
-        collect_returns(&f.body, &mut returns);
+      use oxc_ast::ast::ArrowFunctionBody;
+      if let ArrowFunctionBody::FunctionBody(body) = &f.body {
+        collect_returns(body, &mut returns);
+      } else if let Some(e) = f.body.as_expression() {
+        returns.push(e.span());
       }
       let mut param_deps = vec![false; params.len()];
       for (i, param) in params.iter().enumerate() {

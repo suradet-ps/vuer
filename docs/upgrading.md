@@ -29,10 +29,10 @@ is meant to hold.
    `Span` (offset type, `SourceOffset`), `Allocator`, or the `visit` traits —
    those are the ones that touch vuer's code directly.
 2. **Re-check the MSRV pin.** `Cargo.toml`'s `rust-version` must equal the
-   highest MSRV in the dependency tree (currently `oxc` 0.136 → 1.97.0). If the
+   highest MSRV in the dependency tree (currently `oxc` 0.144 → 1.95.0). If the
    new `oxc` needs a newer rustc, bump `rust-version` *in the same commit* and
    update the pinned toolchain in `.github/workflows/ci.yml` (the
-   `dtolnay/rust-toolchain` step, currently 1.97.1). An MSRV bump is a
+   `dtolnay/rust-toolchain` step, currently 1.95.0). An MSRV bump is a
    minor-or-major version event for vuer (see the versioning policy in Phase 10).
 3. **Keep the versions coherent.** The lockfile currently mixes two `oxc`
    generations (e.g. `oxc_parser` 0.136 with `oxc_syntax` 0.143). That works
@@ -57,8 +57,8 @@ is meant to hold.
 ## MSRV policy
 
 - `rust-version` in `Cargo.toml` is the contract; CI pins a concrete rustc
-  (1.97.1) so builds are reproducible and match the declared floor.
+  (1.95.0) so builds are reproducible and match the declared floor.
 - The header comment in `Cargo.toml` names the crate that sets the floor —
   keep it in sync with reality when the floor moves.
-- `cargo +1.97.1 build` must succeed on every commit; a renovate bump that
+- `cargo +1.95.0 build` must succeed on every commit; a renovate bump that
   silently needs a newer compiler fails CI loudly, which is the point.
