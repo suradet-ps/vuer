@@ -61,13 +61,16 @@ fn manifest_filter() -> Vec<(&'static str, &'static str)> {
   //   * macOS local dev:  /Users/<user>/.../vuer/tests/fixtures/...
   //   * Linux CI:        /home/runner/work/vuer/vuer/tests/fixtures/...
   //   * Docker mounts:   /work/vuer/tests/fixtures/...
+  //   * Windows:         C:\Users\<user>\...\vuer\tests\fixtures\...
   //   * arbitrary other: /anywhere/vuer/tests/fixtures/...
-  // The non-greedy `.*?` matches the shortest prefix, so a path
-  // like `/tmp/vuer-archive/vuer/x.vue` still replaces the
-  // outermost `/vuer/` and keeps the rest intact.
+  // The separator class `[/\\]` covers both POSIX and Windows paths;
+  // `[/\\]+` tolerates JSON-escaped separators (`\\` in a serialized
+  // string is two characters, not one). The non-greedy `.*?` matches the
+  // shortest prefix, so a path like `/tmp/vuer-archive/vuer/x.vue` still
+  // replaces the outermost `/vuer/` and keeps the rest intact.
   vec![
-    (r".*?/vuer/tests/fixtures/", "<FIXTURE>/"),
-    (r".*?/vuer/", "<REPO>/"),
+    (r".*?[/\\]vuer[/\\]+tests[/\\]+fixtures[/\\]+", "<FIXTURE>/"),
+    (r".*?[/\\]vuer[/\\]+", "<REPO>/"),
   ]
 }
 
