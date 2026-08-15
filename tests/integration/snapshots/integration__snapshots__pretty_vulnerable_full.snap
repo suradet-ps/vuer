@@ -74,10 +74,11 @@ error[vue/security/no-postmessage-wildcard]: `postMessage` is called with a wild
 error[vue/security/no-window-open-blank-noopener]: `window.open` with `_blank` is missing `noopener`
 <FIXTURE>/vulnerable_full.vue:33:1
    |
-33 | window.open('https://example.com', '_blank')
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ here
+33 | window.open(redirect, '_blank')
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ here
    |
    = help: Add `noopener` (or `noreferrer`, which implies `noopener`) to the `windowFeatures` string: `window.open(url, '_blank', 'noopener,width=400')`. Without it the opened tab can call `window.opener.location = ...` and phish the originating page.
+   = note: taint from useRoute (line 1) reaches `window.open` URL via redirect
 error[vue/security/no-fetch-without-timeout]: `fetch` is called without an `AbortSignal`
 <FIXTURE>/vulnerable_full.vue:34:1
    |

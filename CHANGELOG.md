@@ -8,6 +8,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Rule-id stability promise: a `vue/...` rule id is never reused or silently
 re-severed. Removing a rule is a major-version event announced here.
 
+## [Unreleased]
+
+### Changed
+
+- `no-window-open-blank-noopener` is now taint-gated: a provably clean
+  URL (a hardcoded literal, or a value derived only from trusted data)
+  is no longer reported — the reverse-tabnabbing surface requires an
+  attacker-influenced URL. A URL carrying untrusted data is still
+  reported at High, with the source→sink flow path in the diagnostic.
+  This closes the remaining `window.open` sink from the Phase 2 list.
+
+### Fixed
+
+- Integration snapshot path filters now accept Windows separators and
+  JSON-escaped `\\` separators, so the suite runs on Windows.
+
 ## [0.2.0] - 2026-08-12
 
 ### Added

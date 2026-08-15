@@ -19,7 +19,7 @@ contexts.
 | [`vue/security/no-unsafe-localstorage`](#vue-security-no-unsafe-localstorage) | High | security | script | Warn when an auth-looking value is written to `localStorage` |
 | [`vue/security/no-dynamic-bind-src`](#vue-security-no-dynamic-bind-src) | High | security | template | Disallow dynamic `:src` bindings to prevent loading untrusted resources |
 | [`vue/security/no-postmessage-wildcard`](#vue-security-no-postmessage-wildcard) | High | security | script | Disallow `postMessage(..., '*')` to prevent cross-origin message interception |
-| [`vue/security/no-window-open-blank-noopener`](#vue-security-no-window-open-blank-noopener) | High | security | script | Disallow `window.open(url, '_blank', ...)` without `noopener` to prevent reverse tabnabbing |
+| [`vue/security/no-window-open-blank-noopener`](#vue-security-no-window-open-blank-noopener) | High | security | script | Disallow `window.open(url, '_blank', ...)` without `noopener` when the URL may carry untrusted data |
 | [`vue/security/no-fetch-without-timeout`](#vue-security-no-fetch-without-timeout) | High | security | script | Disallow `fetch(url)` without an `AbortSignal` to bound request lifetime |
 | [`vue/security/no-unsafe-iframe`](#vue-security-no-unsafe-iframe) | Medium | security | template | Disallow `<iframe>` without a `sandbox` attribute |
 | [`vue/best-practice/v-for-missing-key`](#vue-best-practice-v-for-missing-key) | Medium | best-practice | template | Require `:key` on `v-for` elements |
@@ -488,18 +488,30 @@ attack.
 The rule fires only on `window.open` (not on `popup.open` or other
 `.open()` calls) and only when the target is the literal `'_blank'`.
 
+**Taint-gated (Phase 2).** Reverse tabnabbing only bites when the
+opened page is attacker-influenced. A URL that is provably clean — a
+hardcoded literal or a value derived only from trusted data — opens a
+page the developer chose, so the finding is dropped. A URL carrying
+untrusted data (route query, `localStorage`, props, ...) is reported
+at High with the source→sink flow path; an unanalysable URL is
+reported conservatively.
+
 ### Vulnerable
 
 ```js
-window.open('https://example.com', '_blank')
-window.open('https://example.com', '_blank', 'width=400,height=300')
+const url = localStorage.getItem('next')
+window.open(url, '_blank')
+window.open(route.query.url, '_blank', 'width=400,height=300')
 ```
 
 ### Safe
 
 ```js
+window.open('https://example.com', '_blank')
 window.open('https://example.com', '_blank', 'noopener')
 window.open('https://example.com', '_blank', 'noreferrer')
+const url = localStorage.getItem('next')
+window.open(url, '_blank', 'noopener')
 ```
 
 ### Remediation

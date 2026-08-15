@@ -30,6 +30,6 @@ eval(input)
 location.href = next
 localStorage.setItem('auth_token', jwt)
 iframe.contentWindow.postMessage({ type: 'ping' }, '*')
-window.open('https://example.com', '_blank')
+window.open(redirect, '_blank')
 fetch('/api/users')
 </script>
