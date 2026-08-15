@@ -14,8 +14,4 @@ const route = useRoute()
 
 const userInput = ref(localStorage.getItem('userInput') ?? '')
 const imageUrl = ref(route.query.img)
-
-watch(count, (newVal) => {
-  console.log('Count changed:', newVal)
-})
 </script>

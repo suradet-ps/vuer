@@ -417,9 +417,9 @@ fn rule_meta(id: &RuleId) -> RuleMeta {
       category: "best-practice",
     },
     "vue/best-practice/no-watch-with-callback" => RuleMeta {
-      short: "Disallow `watch` with callback (memory leak risk)",
-      full: "`watch(source, cb)` returns a stop handle that is easy to forget to call.",
-      help: "Prefer `watchEffect` or stop the handle in `onScopeDispose`.",
+      short: "Disallow module-scope `watch` with a callback",
+      full: "A `watch(source, callback)` call at module scope has no component lifecycle to dispose it, so it keeps its closure alive until the page unloads.",
+      help: "Move it into a component, or stop it explicitly with the returned stop handle.",
       severity: Severity::Low,
       category: "best-practice",
     },

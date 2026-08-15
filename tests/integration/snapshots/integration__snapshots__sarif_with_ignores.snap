@@ -277,13 +277,13 @@ expression: json
               "id": "vue/best-practice/no-watch-with-callback",
               "name": "vue/best-practice/no-watch-with-callback",
               "short_description": {
-                "text": "Disallow `watch` with callback (memory leak risk)"
+                "text": "Disallow module-scope `watch` with a callback"
               },
               "full_description": {
-                "text": "`watch(source, cb)` returns a stop handle that is easy to forget to call."
+                "text": "A `watch(source, callback)` call at module scope has no component lifecycle to dispose it, so it keeps its closure alive until the page unloads."
               },
               "help": {
-                "text": "Prefer `watchEffect` or stop the handle in `onScopeDispose`."
+                "text": "Move it into a component, or stop it explicitly with the returned stop handle."
               },
               "default_configuration": {
                 "level": "note"

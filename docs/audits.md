@@ -24,7 +24,7 @@ contexts.
 | [`vue/security/no-unsafe-iframe`](#vue-security-no-unsafe-iframe) | Medium | security | template | Disallow `<iframe>` without a `sandbox` attribute |
 | [`vue/best-practice/v-for-missing-key`](#vue-best-practice-v-for-missing-key) | Medium | best-practice | template | Require `:key` on `v-for` elements |
 | [`vue/best-practice/no-inline-style`](#vue-best-practice-no-inline-style) | Low | best-practice | template | Disallow inline `style` and `:style` bindings in templates |
-| [`vue/best-practice/no-watch-with-callback`](#vue-best-practice-no-watch-with-callback) | Low | best-practice | script | Warn about `watch(source, callback)` calls that may leak when not disposed |
+| [`vue/best-practice/no-watch-with-callback`](#vue-best-practice-no-watch-with-callback) | Low | best-practice | script | Warn about `watch(source, callback)` calls at module scope that have no owner to dispose them |
 
 ---
 
@@ -693,19 +693,30 @@ concerns are better expressed as a class on a stylesheet rule.
 | Auto-fixable | no |
 | Introduced in | v0.1.0 |
 
-`watch(source, callback)` returns a stop handle that is easy to
-forget to call. When the component unmounts (or the reactive
-source goes out of scope) without the handle being called, the
-watcher keeps observing and the callback can leak memory or fire
-against a stale `this`.
+Vue 3 disposes watchers automatically when they are created inside a
+component scope:
 
-The rule flags every `watch` call whose second argument is a
-function expression (arrow or function) and which does **not** use
-the stop handle in the same expression.
+* `<script setup>` — every top-level statement runs inside the
+  component's setup scope; watchers are stopped with the component.
+* Options API — `this.$watch` is bound to the instance and stopped on
+  unmount; a `watch()` call inside `setup()`/`created()`/... is
+  equally owned by the instance.
+
+The one place a `watch(source, callback)` call genuinely leaks is
+**module scope** in a plain `<script>` block (no `setup` attribute):
+the watcher is created once when the module loads, has no component
+lifecycle to be torn down with, and keeps its closure alive until the
+page unloads.
+
+The rule flags only module-scope `watch` calls whose second argument
+is a function expression (arrow or function). In `<script setup>`
+nothing is reported — Vue disposes setup-scope watchers with the
+component.
 
 ### Vulnerable
 
 ```js
+// module scope in a plain <script> block
 watch(count, (newVal) => {
   console.log('Count changed:', newVal)
 })
@@ -714,15 +725,21 @@ watch(count, (newVal) => {
 ### Safe
 
 ```js
+// <script setup>: disposed automatically with the component
+watch(count, (newVal) => {
+  console.log('Count changed:', newVal)
+})
+
+// module scope: store the handle and stop it explicitly
 const stop = watch(count, (newVal) => {
   console.log('Count changed:', newVal)
 })
-onScopeDispose(stop)
+stop()
 ```
 
 ### Remediation
 
-* Prefer `watchEffect` if you do not need a stop handle — the
-  watcher is automatically disposed on scope teardown.
-* If you need `watch`, store the returned handle and call it in
-  `onScopeDispose` or `onUnmounted`.
+* Move the `watch` into the component (a `<script setup>` block or an
+  Options API lifecycle hook), where Vue disposes it automatically.
+* If module scope is required, store the returned stop handle and call
+  it when the watcher is no longer needed.

@@ -22,8 +22,6 @@ const input = route.query.q
 const next = route.query.next
 const jwt = route.query.token
 
-watch(userInput, (n) => { console.log(n) })
-
 el.innerHTML = userInput
 document.write('<h1>x</h1>')
 eval(input)

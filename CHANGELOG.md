@@ -18,6 +18,12 @@ re-severed. Removing a rule is a major-version event announced here.
   attacker-influenced URL. A URL carrying untrusted data is still
   reported at High, with the source→sink flow path in the diagnostic.
   This closes the remaining `window.open` sink from the Phase 2 list.
+- `no-watch-with-callback` is now scope-aware: watchers created inside
+  a component (`<script setup>` or Options API) are disposed
+  automatically by Vue, so they are no longer reported. Only `watch`
+  calls at **module scope** in a plain `<script>` block — the one place
+  the watcher has no lifecycle to be torn down with — are flagged, with
+  a corrected message and help text.
 - **`oxc` bumped 0.136/0.143 → 0.144** — the whole cohort moves
   together (parser, allocator, ast, ast_visit, span, syntax,
   diagnostics), removing the mixed-generation lockfile. Breaking

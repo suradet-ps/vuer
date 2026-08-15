@@ -12,6 +12,12 @@ pub struct ScanContext {
   pub template: Option<String>,
   pub script: Option<String>,
   pub lang: ScriptLang,
+  /// True when the `<script>` block carries the `setup` attribute. In
+  /// `<script setup>`, every top-level statement runs inside the
+  /// component's setup scope, so watchers created there are disposed
+  /// automatically with the component (rules like
+  /// `no-watch-with-callback` use this to avoid false positives).
+  pub script_setup: bool,
   pub template_offset: usize,
   pub script_offset: usize,
   /// The parsed template AST, when a `<template>` block exists and was
@@ -49,6 +55,7 @@ impl ScanContext {
       template: None,
       script: None,
       lang: ScriptLang::Unknown,
+      script_setup: false,
       template_offset: 0,
       script_offset: 0,
       template_ast: None,

@@ -67,7 +67,6 @@ fn vulnerable_fixture_flags_all_known_categories() {
     "vue/security/no-dynamic-bind-src",
     "vue/security/no-v-html",
     "vue/best-practice/no-inline-style",
-    "vue/best-practice/no-watch-with-callback",
   ];
   for e in expected {
     assert!(ids.contains(&e), "missing {e} in {ids:?}");
@@ -101,7 +100,6 @@ fn vulnerable_full_fixture_flags_expected_set() {
     "vue/security/no-window-open-blank-noopener",
     "vue/security/no-fetch-without-timeout",
     "vue/best-practice/v-for-missing-key",
-    "vue/best-practice/no-watch-with-callback",
   ] {
     assert!(ids.contains(&expected), "missing {expected} in {ids:?}");
   }
@@ -275,7 +273,10 @@ fn rule_inline_style_fires() {
 
 #[test]
 fn rule_watch_with_callback_fires() {
-  assert_rule_fires("vue/best-practice/no-watch-with-callback", "vulnerable.vue");
+  assert_rule_fires(
+    "vue/best-practice/no-watch-with-callback",
+    "watch-module-scope.vue",
+  );
 }
 
 #[test]

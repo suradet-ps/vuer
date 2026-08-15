@@ -141,6 +141,7 @@ pub fn parse_sfc(ctx: &mut ScanContext) {
 
   if let Some(block) = script_block {
     ctx.lang = detect_lang(block.attrs);
+    ctx.script_setup = attrs_have_setup(block.attrs);
     ctx.script_offset = block.content_offset;
     ctx.script = Some(block.content.to_string());
   }
@@ -297,6 +298,15 @@ fn detect_lang(attrs: &str) -> ScriptLang {
   } else {
     ScriptLang::JavaScript
   }
+}
+
+/// True when the `<script>` block carries a bare `setup` attribute.
+/// Attribute syntax is fixed and tiny (`setup`, `setup lang="ts"`, ...),
+/// so a whitespace-split on the attribute source is sufficient.
+fn attrs_have_setup(attrs: &str) -> bool {
+  attrs
+    .split_whitespace()
+    .any(|a| a.split('=').next() == Some("setup"))
 }
 
 /// Convenience: parse a template that lives outside the SFC (e.g. in tests).

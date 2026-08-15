@@ -74,26 +74,6 @@ expression: json
               }
             },
             {
-              "id": "vue/best-practice/no-watch-with-callback",
-              "name": "vue/best-practice/no-watch-with-callback",
-              "short_description": {
-                "text": "Disallow `watch` with callback (memory leak risk)"
-              },
-              "full_description": {
-                "text": "`watch(source, cb)` returns a stop handle that is easy to forget to call."
-              },
-              "help": {
-                "text": "Prefer `watchEffect` or stop the handle in `onScopeDispose`."
-              },
-              "default_configuration": {
-                "level": "note"
-              },
-              "properties": {
-                "category": "best-practice",
-                "security_severity": "low"
-              }
-            },
-            {
               "id": "vue/security/no-inner-html",
               "name": "vue/security/no-inner-html",
               "short_description": {
@@ -294,6 +274,26 @@ expression: json
               }
             },
             {
+              "id": "vue/best-practice/no-watch-with-callback",
+              "name": "vue/best-practice/no-watch-with-callback",
+              "short_description": {
+                "text": "Disallow module-scope `watch` with a callback"
+              },
+              "full_description": {
+                "text": "A `watch(source, callback)` call at module scope has no component lifecycle to dispose it, so it keeps its closure alive until the page unloads."
+              },
+              "help": {
+                "text": "Move it into a component, or stop it explicitly with the returned stop handle."
+              },
+              "default_configuration": {
+                "level": "note"
+              },
+              "properties": {
+                "category": "best-practice",
+                "security_severity": "low"
+              }
+            },
+            {
               "id": "vue/best-practice/v-for-missing-key",
               "name": "vue/best-practice/v-for-missing-key",
               "short_description": {
@@ -390,32 +390,6 @@ expression: json
                   "endColumn": 46,
                   "byteOffset": 96,
                   "byteLength": 36
-                }
-              }
-            }
-          ]
-        },
-        {
-          "ruleId": "vue/best-practice/no-watch-with-callback",
-          "ruleIndex": 3,
-          "level": "note",
-          "message": {
-            "text": "`watch` with a callback can leak memory if not cleaned up"
-          },
-          "locations": [
-            {
-              "physicalLocation": {
-                "artifactLocation": {
-<FIXTURE>/vulnerable.vue",
-                  "uriBaseId": "%SRCROOT%"
-                },
-                "region": {
-                  "startLine": 18,
-                  "startColumn": 1,
-                  "endLine": 20,
-                  "endColumn": 3,
-                  "byteOffset": 386,
-                  "byteLength": 69
                 }
               }
             }

@@ -13,39 +13,39 @@ error[vue/security/no-v-html]: Unsafe `v-html` directive renders untrusted HTML
   = help: Rendering untrusted HTML can execute arbitrary JavaScript. Sanitise the input with DOMPurify (or an equivalent library), or use `v-text` / `{ }` interpolation instead.
   = note: taint from localStorage.getItem (line 1) reaches `v-html` binding via userInput
 error[vue/security/no-inner-html]: `.innerHTML` assignment introduces a DOM XSS sink
-<FIXTURE>/vulnerable_full.vue:27:1
+<FIXTURE>/vulnerable_full.vue:25:1
    |
-27 | el.innerHTML = userInput
+25 | el.innerHTML = userInput
    | ^^^^^^^^^^^^^^^^^^^^^^^^ here
    |
    = help: Setting `.innerHTML` from a dynamic value lets an attacker inject script tags and event handlers. Use `textContent` for plain text, or sanitise the value with DOMPurify before insertion.
    = note: taint from localStorage.getItem (line 1) reaches `.innerHTML` write via userInput
 error[vue/security/no-document-write]: `document.write` is a known XSS sink
-<FIXTURE>/vulnerable_full.vue:28:1
+<FIXTURE>/vulnerable_full.vue:26:1
    |
-28 | document.write('<h1>x</h1>')
+26 | document.write('<h1>x</h1>')
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ here
    |
    = help: `document.write` after page load is almost always an XSS risk. Use `appendChild`, `Element.innerHTML` (with sanitisation), or update via Vue reactivity instead.
 error[vue/security/no-eval]: `eval` and `new Function` execute arbitrary code
-<FIXTURE>/vulnerable_full.vue:29:1
+<FIXTURE>/vulnerable_full.vue:27:1
    |
-29 | eval(input)
+27 | eval(input)
    | ^^^^^^^^^^^ here
    |
    = help: `eval` (and `new Function`) execute strings as JavaScript. With any attacker-controlled substring this is RCE. Refactor to a static expression, a lookup table, or `Function.prototype` bindings.
 error[vue/security/no-open-redirect]: Unvalidated value is forwarded to a navigation sink
-<FIXTURE>/vulnerable_full.vue:30:1
+<FIXTURE>/vulnerable_full.vue:28:1
    |
-30 | location.href = next
+28 | location.href = next
    | ^^^^^^^^^^^^^^^^^^^^ here
    |
    = help: Forwarding user-controlled data to `location.*` is a classic open-redirect vector. Validate the URL against an allow-list of hostnames before navigating, or use a router-managed navigation helper.
    = note: taint from useRoute (line 1) reaches navigation assignment via next
 error[vue/security/no-unsafe-localstorage]: Auth-looking value is being written to `localStorage`
-<FIXTURE>/vulnerable_full.vue:31:1
+<FIXTURE>/vulnerable_full.vue:29:1
    |
-31 | localStorage.setItem('auth_token', jwt)
+29 | localStorage.setItem('auth_token', jwt)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ here
    |
    = help: Tokens in `localStorage` are reachable by any script running on the page (including injected ones) and persist across sessions. Prefer an `HttpOnly; Secure` cookie set by the server, or use `sessionStorage` for short-lived data.
@@ -65,34 +65,27 @@ error[vue/security/no-dynamic-bind-src]: Dynamic `src` binding can load untruste
   = help: Validate and sanitise the URL before binding it. Allow only an explicit allow-list of schemes (https, /) and hosts, and never concatenate user input into the URL.
   = note: taint from useRoute (line 1) reaches dynamic `src` binding via userAvatar
 error[vue/security/no-postmessage-wildcard]: `postMessage` is called with a wildcard `targetOrigin` of `'*'`
-<FIXTURE>/vulnerable_full.vue:32:1
+<FIXTURE>/vulnerable_full.vue:30:1
    |
-32 | iframe.contentWindow.postMessage({ type: 'ping' }, '*')
+30 | iframe.contentWindow.postMessage({ type: 'ping' }, '*')
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ here
    |
    = help: Always pin a specific `targetOrigin` (for example `https://app.example.com`). The wildcard `'*'` lets a malicious site that has navigated the target window intercept the message. Use the URL of the receiver, or `/` only when you genuinely want same-origin delivery.
 error[vue/security/no-window-open-blank-noopener]: `window.open` with `_blank` is missing `noopener`
-<FIXTURE>/vulnerable_full.vue:33:1
+<FIXTURE>/vulnerable_full.vue:31:1
    |
-33 | window.open(redirect, '_blank')
+31 | window.open(redirect, '_blank')
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ here
    |
    = help: Add `noopener` (or `noreferrer`, which implies `noopener`) to the `windowFeatures` string: `window.open(url, '_blank', 'noopener,width=400')`. Without it the opened tab can call `window.opener.location = ...` and phish the originating page.
    = note: taint from useRoute (line 1) reaches `window.open` URL via redirect
 error[vue/security/no-fetch-without-timeout]: `fetch` is called without an `AbortSignal`
-<FIXTURE>/vulnerable_full.vue:34:1
+<FIXTURE>/vulnerable_full.vue:32:1
    |
-34 | fetch('/api/users')
+32 | fetch('/api/users')
    | ^^^^^^^^^^^^^^^^^^^ here
    |
    = help: Pass a `signal` from an `AbortController` so the request can be cancelled: `fetch(url, { signal: ctrl.signal })`. Without it, a slow or unreachable host can hang the call indefinitely, exhausting the connection pool and leaking user state. Pair with a `setTimeout` to bound the wait time.
-note[vue/best-practice/no-watch-with-callback]: `watch` with a callback can leak memory if not cleaned up
-<FIXTURE>/vulnerable_full.vue:25:1
-   |
-25 | watch(userInput, (n) => { console.log(n) })
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ here
-   |
-   = help: Prefer `watchEffect`, or make sure the watcher is stopped via the returned handle inside `onScopeDispose` / `onUnmounted`.
 warning[vue/best-practice/v-for-missing-key]: `v-for` is missing a `:key` binding
 <FIXTURE>/vulnerable_full.vue:7:5
   |
@@ -101,4 +94,4 @@ warning[vue/best-practice/v-for-missing-key]: `v-for` is missing a `:key` bindin
   |
   = help: Without a stable `:key`, Vue falls back to index-based reconciliation which produces wrong DOM updates and loses component state when the list reorders. Add `:key="item.id"` (or any stable identifier).
 
-13 violations: 3 critical, 7 high, 2 medium, 1 low
+12 violations: 3 critical, 7 high, 2 medium

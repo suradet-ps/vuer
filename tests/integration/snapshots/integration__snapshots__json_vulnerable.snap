@@ -35,16 +35,5 @@ expression: json
     "rule_id": "vue/best-practice/no-inline-style",
     "rule_name": "no-inline-style",
     "severity": "low"
-  },
-  {
-    "byte_length": 69,
-    "byte_offset": 386,
-    "category": "bestpractice",
-<FIXTURE>/vulnerable.vue",
-    "ignored": false,
-    "message": "`watch` with a callback can leak memory if not cleaned up",
-    "rule_id": "vue/best-practice/no-watch-with-callback",
-    "rule_name": "no-watch-with-callback",
-    "severity": "low"
   }
 ]

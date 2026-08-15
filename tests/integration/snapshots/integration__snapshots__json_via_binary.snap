@@ -58,17 +58,5 @@ expression: out.stdout
     "byte_offset": 96,
     "byte_length": 36,
     "ignored": false
-  },
-  {
-<FIXTURE>/vulnerable.vue",
-    "rule_id": "vue/best-practice/no-watch-with-callback",
-    "rule_name": "no-watch-with-callback",
-    "severity": "low",
-    "category": "best-practice",
-    "message": "`watch` with a callback can leak memory if not cleaned up",
-    "help": "Prefer `watchEffect`, or make sure the watcher is stopped via the returned handle inside `onScopeDispose` / `onUnmounted`.",
-    "byte_offset": 386,
-    "byte_length": 69,
-    "ignored": false
   }
 ]
