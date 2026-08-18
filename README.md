@@ -246,6 +246,17 @@ Full reference documentation lives under `docs/`:
 | `vue/best-practice/no-inline-style` | Low | best-practice | Disallow inline `style` |
 | `vue/best-practice/no-watch-with-callback` | Low | best-practice | Warn on `watch(src, cb)` without disposal |
 | `vue/best-practice/v-for-missing-key` | Medium | best-practice | Require `:key` on `v-for` |
+| `vue/performance/no-v-if-with-v-for` | Medium | performance | Disallow `v-if` with `v-for` on the same element |
+| `vue/performance/no-deep-watch-without-handler` | Low | performance | Warn on `watch(..., { deep: true })` |
+| `vue/performance/no-reactive-in-v-for` | Low | performance | Disallow reactive creation in loop bodies |
+| `vue/performance/no-large-list-without-virtualization` | Low | performance | Heuristic: large lists need virtual scrolling |
+| `vue/accessibility/no-img-without-alt` | Medium | accessibility | Require `alt` on `<img>` |
+| `vue/accessibility/no-click-without-role-keyboard` | Medium | accessibility | Require `role` + keyboard on `@click` of non-interactive elements |
+| `vue/accessibility/no-form-without-label` | Medium | accessibility | Require a label on form fields |
+| `vue/accessibility/no-button-without-type` | Low | accessibility | Require `type` on `<button>` |
+| `vue/architecture/no-side-effect-in-computed` | Medium | architecture | Disallow side effects in `computed` |
+| `vue/architecture/no-mutation-of-props` | Medium | architecture | Disallow `defineProps` writes |
+| `vue/architecture/no-async-setup-without-error-boundary` | Low | architecture | Heuristic: `async setup()` needs `<Suspense>` |
 
 ## Architecture
 
@@ -332,6 +343,17 @@ src/
     no_inline_styles.rs
     no_watch_with_callback.rs
     v_for_missing_key.rs
+    no_v_if_with_v_for.rs       # performance
+    no_deep_watch_without_handler.rs
+    no_reactive_in_v_for.rs
+    no_large_list_without_virtualization.rs
+    no_img_without_alt.rs       # accessibility
+    no_click_without_role_keyboard.rs
+    no_form_without_label.rs
+    no_button_without_type.rs
+    no_side_effect_in_computed.rs  # architecture
+    no_mutation_of_props.rs
+    no_async_setup_without_error_boundary.rs
   visitor/
     mod.rs              # walk / for_each_element
   report/
