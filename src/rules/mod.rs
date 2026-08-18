@@ -6,12 +6,16 @@ use crate::rule_id::RuleId;
 use crate::severity::Severity;
 use crate::taint::FlowPath;
 
+pub mod no_button_without_type;
+pub mod no_click_without_role_keyboard;
 pub mod no_dangerous_url;
 pub mod no_deep_watch_without_handler;
 pub mod no_document_write;
 pub mod no_dynamic_bind;
 pub mod no_eval;
 pub mod no_fetch_without_timeout;
+pub mod no_form_without_label;
+pub mod no_img_without_alt;
 pub mod no_inline_styles;
 pub mod no_inner_html;
 pub mod no_large_list_without_virtualization;
@@ -160,6 +164,11 @@ impl RuleRegistry {
       Box::new(no_deep_watch_without_handler::NoDeepWatchWithoutHandler),
       Box::new(no_reactive_in_v_for::NoReactiveInVFor),
       Box::new(no_large_list_without_virtualization::NoLargeListWithoutVirtualization),
+      // Accessibility
+      Box::new(no_img_without_alt::NoImgWithoutAlt),
+      Box::new(no_click_without_role_keyboard::NoClickWithoutRoleKeyboard),
+      Box::new(no_form_without_label::NoFormWithoutLabel),
+      Box::new(no_button_without_type::NoButtonWithoutType),
     ];
     Self { rules }
   }

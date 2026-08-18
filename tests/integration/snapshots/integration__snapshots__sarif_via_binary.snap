@@ -74,6 +74,26 @@ expression: out.stdout
               }
             },
             {
+              "id": "vue/accessibility/no-img-without-alt",
+              "name": "vue/accessibility/no-img-without-alt",
+              "short_description": {
+                "text": "Require `alt` on `<img>`"
+              },
+              "full_description": {
+                "text": "An image without `alt` is announced as its filename (or skipped) by screen readers."
+              },
+              "help": {
+                "text": "Add `alt` text, or `alt=\"\"` for decorative images."
+              },
+              "default_configuration": {
+                "level": "warning"
+              },
+              "properties": {
+                "category": "accessibility",
+                "security_severity": "medium"
+              }
+            },
+            {
               "id": "vue/security/no-inner-html",
               "name": "vue/security/no-inner-html",
               "short_description": {
@@ -392,6 +412,66 @@ expression: out.stdout
                 "category": "performance",
                 "security_severity": "low"
               }
+            },
+            {
+              "id": "vue/accessibility/no-click-without-role-keyboard",
+              "name": "vue/accessibility/no-click-without-role-keyboard",
+              "short_description": {
+                "text": "Require `role` + keyboard on `@click` of non-interactive elements"
+              },
+              "full_description": {
+                "text": "An element that reacts to clicks but cannot receive keyboard focus is unreachable for keyboard-only users."
+              },
+              "help": {
+                "text": "Use a real interactive element, or add `role` and a keyboard handler."
+              },
+              "default_configuration": {
+                "level": "warning"
+              },
+              "properties": {
+                "category": "accessibility",
+                "security_severity": "medium"
+              }
+            },
+            {
+              "id": "vue/accessibility/no-form-without-label",
+              "name": "vue/accessibility/no-form-without-label",
+              "short_description": {
+                "text": "Require a label on form fields"
+              },
+              "full_description": {
+                "text": "An unlabelled input is announced only as its type by screen readers."
+              },
+              "help": {
+                "text": "Associate a `<label>` or add `aria-label`."
+              },
+              "default_configuration": {
+                "level": "warning"
+              },
+              "properties": {
+                "category": "accessibility",
+                "security_severity": "medium"
+              }
+            },
+            {
+              "id": "vue/accessibility/no-button-without-type",
+              "name": "vue/accessibility/no-button-without-type",
+              "short_description": {
+                "text": "Require `type` on `<button>`"
+              },
+              "full_description": {
+                "text": "A `<button>` without `type` defaults to `submit`, so a click inside a form submits and navigates."
+              },
+              "help": {
+                "text": "Set `type=\"button\"` for in-page actions."
+              },
+              "default_configuration": {
+                "level": "note"
+              },
+              "properties": {
+                "category": "accessibility",
+                "security_severity": "low"
+              }
             }
           ]
         }
@@ -470,6 +550,32 @@ expression: out.stdout
                   "endColumn": 46,
                   "byteOffset": 96,
                   "byteLength": 36
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "vue/accessibility/no-img-without-alt",
+          "ruleIndex": 3,
+          "level": "warning",
+          "message": {
+            "text": "`<img>` without an `alt` attribute"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+<FIXTURE>/vulnerable.vue",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "startLine": 4,
+                  "startColumn": 5,
+                  "endLine": 4,
+                  "endColumn": 26,
+                  "byteOffset": 65,
+                  "byteLength": 21
                 }
               }
             }

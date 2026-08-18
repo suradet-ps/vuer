@@ -93,5 +93,12 @@ warning[vue/best-practice/v-for-missing-key]: `v-for` is missing a `:key` bindin
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ here
   |
   = help: Without a stable `:key`, Vue falls back to index-based reconciliation which produces wrong DOM updates and loses component state when the list reorders. Add `:key="item.id"` (or any stable identifier).
+warning[vue/accessibility/no-img-without-alt]: `<img>` without an `alt` attribute
+<FIXTURE>/vulnerable_full.vue:5:3
+  |
+5 |   <img :src="userAvatar">
+  |   ^^^^^^^^^^^^^^^^^^^^^^^ here
+  |
+  = help: Screen readers announce the `alt` text in place of the image. Add `alt="description"`, or `alt=""` for purely decorative images. Dynamic images can bind `:alt="item.label"`.
 
-12 violations: 3 critical, 7 high, 2 medium
+13 violations: 3 critical, 7 high, 3 medium

@@ -458,6 +458,34 @@ fn rule_meta(id: &RuleId) -> RuleMeta {
       severity: Severity::Low,
       category: "performance",
     },
+    "vue/accessibility/no-img-without-alt" => RuleMeta {
+      short: "Require `alt` on `<img>`",
+      full: "An image without `alt` is announced as its filename (or skipped) by screen readers.",
+      help: "Add `alt` text, or `alt=\"\"` for decorative images.",
+      severity: Severity::Medium,
+      category: "accessibility",
+    },
+    "vue/accessibility/no-click-without-role-keyboard" => RuleMeta {
+      short: "Require `role` + keyboard on `@click` of non-interactive elements",
+      full: "An element that reacts to clicks but cannot receive keyboard focus is unreachable for keyboard-only users.",
+      help: "Use a real interactive element, or add `role` and a keyboard handler.",
+      severity: Severity::Medium,
+      category: "accessibility",
+    },
+    "vue/accessibility/no-form-without-label" => RuleMeta {
+      short: "Require a label on form fields",
+      full: "An unlabelled input is announced only as its type by screen readers.",
+      help: "Associate a `<label>` or add `aria-label`.",
+      severity: Severity::Medium,
+      category: "accessibility",
+    },
+    "vue/accessibility/no-button-without-type" => RuleMeta {
+      short: "Require `type` on `<button>`",
+      full: "A `<button>` without `type` defaults to `submit`, so a click inside a form submits and navigates.",
+      help: "Set `type=\"button\"` for in-page actions.",
+      severity: Severity::Low,
+      category: "accessibility",
+    },
     _ => RuleMeta {
       short: "Vuer rule",
       full: "No description available.",
@@ -489,6 +517,10 @@ fn known_rule_ids() -> Vec<RuleId> {
     RuleId::new("vue/performance/no-deep-watch-without-handler"),
     RuleId::new("vue/performance/no-reactive-in-v-for"),
     RuleId::new("vue/performance/no-large-list-without-virtualization"),
+    RuleId::new("vue/accessibility/no-img-without-alt"),
+    RuleId::new("vue/accessibility/no-click-without-role-keyboard"),
+    RuleId::new("vue/accessibility/no-form-without-label"),
+    RuleId::new("vue/accessibility/no-button-without-type"),
   ]
 }
 
