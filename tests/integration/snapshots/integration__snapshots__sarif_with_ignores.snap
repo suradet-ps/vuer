@@ -472,6 +472,66 @@ expression: json
                 "category": "accessibility",
                 "security_severity": "low"
               }
+            },
+            {
+              "id": "vue/architecture/no-side-effect-in-computed",
+              "name": "vue/architecture/no-side-effect-in-computed",
+              "short_description": {
+                "text": "Disallow side effects in `computed`"
+              },
+              "full_description": {
+                "text": "A computed getter must be pure; Vue re-evaluates it lazily and unpredictably."
+              },
+              "help": {
+                "text": "Move side effects to a `watch` or event handler."
+              },
+              "default_configuration": {
+                "level": "warning"
+              },
+              "properties": {
+                "category": "architecture",
+                "security_severity": "medium"
+              }
+            },
+            {
+              "id": "vue/architecture/no-mutation-of-props",
+              "name": "vue/architecture/no-mutation-of-props",
+              "short_description": {
+                "text": "Disallow `defineProps` writes"
+              },
+              "full_description": {
+                "text": "Writing to a prop diverges the child from the parent and is lost on the next re-render."
+              },
+              "help": {
+                "text": "`emit` an event and let the parent update its state."
+              },
+              "default_configuration": {
+                "level": "warning"
+              },
+              "properties": {
+                "category": "architecture",
+                "security_severity": "medium"
+              }
+            },
+            {
+              "id": "vue/architecture/no-async-setup-without-error-boundary",
+              "name": "vue/architecture/no-async-setup-without-error-boundary",
+              "short_description": {
+                "text": "Heuristic: `async setup()` needs `<Suspense>`"
+              },
+              "full_description": {
+                "text": "An `async setup()` component renders nothing until its promise resolves without a `Suspense` boundary."
+              },
+              "help": {
+                "text": "Wrap the component in `<Suspense>` or suppress with a rationale."
+              },
+              "default_configuration": {
+                "level": "note"
+              },
+              "properties": {
+                "category": "architecture",
+                "security_severity": "low"
+              }
             }
           ]
         }

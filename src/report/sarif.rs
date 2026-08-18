@@ -486,6 +486,27 @@ fn rule_meta(id: &RuleId) -> RuleMeta {
       severity: Severity::Low,
       category: "accessibility",
     },
+    "vue/architecture/no-side-effect-in-computed" => RuleMeta {
+      short: "Disallow side effects in `computed`",
+      full: "A computed getter must be pure; Vue re-evaluates it lazily and unpredictably.",
+      help: "Move side effects to a `watch` or event handler.",
+      severity: Severity::Medium,
+      category: "architecture",
+    },
+    "vue/architecture/no-mutation-of-props" => RuleMeta {
+      short: "Disallow `defineProps` writes",
+      full: "Writing to a prop diverges the child from the parent and is lost on the next re-render.",
+      help: "`emit` an event and let the parent update its state.",
+      severity: Severity::Medium,
+      category: "architecture",
+    },
+    "vue/architecture/no-async-setup-without-error-boundary" => RuleMeta {
+      short: "Heuristic: `async setup()` needs `<Suspense>`",
+      full: "An `async setup()` component renders nothing until its promise resolves without a `Suspense` boundary.",
+      help: "Wrap the component in `<Suspense>` or suppress with a rationale.",
+      severity: Severity::Low,
+      category: "architecture",
+    },
     _ => RuleMeta {
       short: "Vuer rule",
       full: "No description available.",
@@ -521,6 +542,9 @@ fn known_rule_ids() -> Vec<RuleId> {
     RuleId::new("vue/accessibility/no-click-without-role-keyboard"),
     RuleId::new("vue/accessibility/no-form-without-label"),
     RuleId::new("vue/accessibility/no-button-without-type"),
+    RuleId::new("vue/architecture/no-side-effect-in-computed"),
+    RuleId::new("vue/architecture/no-mutation-of-props"),
+    RuleId::new("vue/architecture/no-async-setup-without-error-boundary"),
   ]
 }
 
