@@ -430,6 +430,34 @@ fn rule_meta(id: &RuleId) -> RuleMeta {
       severity: Severity::Medium,
       category: "best-practice",
     },
+    "vue/performance/no-v-if-with-v-for" => RuleMeta {
+      short: "Disallow `v-if` with `v-for` on the same element",
+      full: "Vue 3 evaluates `v-if` before `v-for`, so the list is built and then discarded when the condition is false.",
+      help: "Filter the list with a computed property instead.",
+      severity: Severity::Medium,
+      category: "performance",
+    },
+    "vue/performance/no-deep-watch-without-handler" => RuleMeta {
+      short: "Disallow deep watchers on inline options",
+      full: "A `watch(source, cb, { deep: true })` watcher re-compares every nested property on each mutation.",
+      help: "Watch an explicit path or use `{ once: true }`.",
+      severity: Severity::Low,
+      category: "performance",
+    },
+    "vue/performance/no-reactive-in-v-for" => RuleMeta {
+      short: "Disallow reactive creation in loop bodies",
+      full: "Creating `ref`/`reactive`/`computed` wrappers inside a loop allocates a fresh effect per iteration.",
+      help: "Hoist the wrapper out of the loop.",
+      severity: Severity::Low,
+      category: "performance",
+    },
+    "vue/performance/no-large-list-without-virtualization" => RuleMeta {
+      short: "Heuristic: large lists need virtual scrolling",
+      full: "A `v-for` over a large-looking collection without a virtual-scroll wrapper can freeze the main thread.",
+      help: "Wrap the list in a virtual-scroll component or paginate.",
+      severity: Severity::Low,
+      category: "performance",
+    },
     _ => RuleMeta {
       short: "Vuer rule",
       full: "No description available.",
@@ -457,6 +485,10 @@ fn known_rule_ids() -> Vec<RuleId> {
     RuleId::new("vue/best-practice/no-inline-style"),
     RuleId::new("vue/best-practice/no-watch-with-callback"),
     RuleId::new("vue/best-practice/v-for-missing-key"),
+    RuleId::new("vue/performance/no-v-if-with-v-for"),
+    RuleId::new("vue/performance/no-deep-watch-without-handler"),
+    RuleId::new("vue/performance/no-reactive-in-v-for"),
+    RuleId::new("vue/performance/no-large-list-without-virtualization"),
   ]
 }
 

@@ -312,6 +312,86 @@ expression: json
                 "category": "best-practice",
                 "security_severity": "medium"
               }
+            },
+            {
+              "id": "vue/performance/no-v-if-with-v-for",
+              "name": "vue/performance/no-v-if-with-v-for",
+              "short_description": {
+                "text": "Disallow `v-if` with `v-for` on the same element"
+              },
+              "full_description": {
+                "text": "Vue 3 evaluates `v-if` before `v-for`, so the list is built and then discarded when the condition is false."
+              },
+              "help": {
+                "text": "Filter the list with a computed property instead."
+              },
+              "default_configuration": {
+                "level": "warning"
+              },
+              "properties": {
+                "category": "performance",
+                "security_severity": "medium"
+              }
+            },
+            {
+              "id": "vue/performance/no-deep-watch-without-handler",
+              "name": "vue/performance/no-deep-watch-without-handler",
+              "short_description": {
+                "text": "Disallow deep watchers on inline options"
+              },
+              "full_description": {
+                "text": "A `watch(source, cb, { deep: true })` watcher re-compares every nested property on each mutation."
+              },
+              "help": {
+                "text": "Watch an explicit path or use `{ once: true }`."
+              },
+              "default_configuration": {
+                "level": "note"
+              },
+              "properties": {
+                "category": "performance",
+                "security_severity": "low"
+              }
+            },
+            {
+              "id": "vue/performance/no-reactive-in-v-for",
+              "name": "vue/performance/no-reactive-in-v-for",
+              "short_description": {
+                "text": "Disallow reactive creation in loop bodies"
+              },
+              "full_description": {
+                "text": "Creating `ref`/`reactive`/`computed` wrappers inside a loop allocates a fresh effect per iteration."
+              },
+              "help": {
+                "text": "Hoist the wrapper out of the loop."
+              },
+              "default_configuration": {
+                "level": "note"
+              },
+              "properties": {
+                "category": "performance",
+                "security_severity": "low"
+              }
+            },
+            {
+              "id": "vue/performance/no-large-list-without-virtualization",
+              "name": "vue/performance/no-large-list-without-virtualization",
+              "short_description": {
+                "text": "Heuristic: large lists need virtual scrolling"
+              },
+              "full_description": {
+                "text": "A `v-for` over a large-looking collection without a virtual-scroll wrapper can freeze the main thread."
+              },
+              "help": {
+                "text": "Wrap the list in a virtual-scroll component or paginate."
+              },
+              "default_configuration": {
+                "level": "note"
+              },
+              "properties": {
+                "category": "performance",
+                "security_severity": "low"
+              }
             }
           ]
         }
