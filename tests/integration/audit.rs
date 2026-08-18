@@ -285,6 +285,165 @@ fn rule_v_for_missing_key_fires() {
 }
 
 // ---------------------------------------------------------------------
+// Phase 3 categories: performance / accessibility / architecture.
+// Each new rule fires on its category fixture and stays silent on the
+// shared clean fixtures.
+// ---------------------------------------------------------------------
+
+#[test]
+fn rule_no_v_if_with_v_for_fires() {
+  assert_rule_fires(
+    "vue/performance/no-v-if-with-v-for",
+    "vulnerable_performance.vue",
+  );
+  assert_rule_silent("vue/performance/no-v-if-with-v-for", "clean.vue");
+  assert_rule_silent("vue/performance/no-v-if-with-v-for", "clean_full.vue");
+}
+
+#[test]
+fn rule_no_deep_watch_without_handler_fires() {
+  assert_rule_fires(
+    "vue/performance/no-deep-watch-without-handler",
+    "vulnerable_performance.vue",
+  );
+  assert_rule_silent("vue/performance/no-deep-watch-without-handler", "clean.vue");
+  assert_rule_silent(
+    "vue/performance/no-deep-watch-without-handler",
+    "watch-module-scope.vue",
+  );
+}
+
+#[test]
+fn rule_no_reactive_in_v_for_fires() {
+  assert_rule_fires(
+    "vue/performance/no-reactive-in-v-for",
+    "vulnerable_performance.vue",
+  );
+  assert_rule_silent("vue/performance/no-reactive-in-v-for", "clean.vue");
+}
+
+#[test]
+fn rule_no_large_list_without_virtualization_fires() {
+  assert_rule_fires(
+    "vue/performance/no-large-list-without-virtualization",
+    "vulnerable_performance.vue",
+  );
+  assert_rule_silent(
+    "vue/performance/no-large-list-without-virtualization",
+    "clean.vue",
+  );
+}
+
+#[test]
+fn rule_no_img_without_alt_fires() {
+  assert_rule_fires(
+    "vue/accessibility/no-img-without-alt",
+    "vulnerable_accessibility.vue",
+  );
+  assert_rule_silent("vue/accessibility/no-img-without-alt", "clean.vue");
+  assert_rule_silent("vue/accessibility/no-img-without-alt", "clean_full.vue");
+}
+
+#[test]
+fn rule_no_click_without_role_keyboard_fires() {
+  assert_rule_fires(
+    "vue/accessibility/no-click-without-role-keyboard",
+    "vulnerable_accessibility.vue",
+  );
+  assert_rule_silent(
+    "vue/accessibility/no-click-without-role-keyboard",
+    "clean.vue",
+  );
+  assert_rule_silent(
+    "vue/accessibility/no-click-without-role-keyboard",
+    "clean_full.vue",
+  );
+}
+
+#[test]
+fn rule_no_form_without_label_fires() {
+  assert_rule_fires(
+    "vue/accessibility/no-form-without-label",
+    "vulnerable_accessibility.vue",
+  );
+  assert_rule_silent("vue/accessibility/no-form-without-label", "clean.vue");
+  assert_rule_silent("vue/accessibility/no-form-without-label", "clean_full.vue");
+}
+
+#[test]
+fn rule_no_button_without_type_fires() {
+  assert_rule_fires(
+    "vue/accessibility/no-button-without-type",
+    "vulnerable_accessibility.vue",
+  );
+  assert_rule_silent("vue/accessibility/no-button-without-type", "clean.vue");
+  assert_rule_silent("vue/accessibility/no-button-without-type", "clean_full.vue");
+}
+
+#[test]
+fn rule_no_side_effect_in_computed_fires() {
+  assert_rule_fires(
+    "vue/architecture/no-side-effect-in-computed",
+    "vulnerable_architecture.vue",
+  );
+  assert_rule_silent("vue/architecture/no-side-effect-in-computed", "clean.vue");
+  assert_rule_silent(
+    "vue/architecture/no-side-effect-in-computed",
+    "clean_full.vue",
+  );
+}
+
+#[test]
+fn rule_no_mutation_of_props_fires() {
+  assert_rule_fires(
+    "vue/architecture/no-mutation-of-props",
+    "vulnerable_architecture.vue",
+  );
+  assert_rule_silent("vue/architecture/no-mutation-of-props", "clean.vue");
+  assert_rule_silent("vue/architecture/no-mutation-of-props", "clean_full.vue");
+}
+
+#[test]
+fn rule_no_async_setup_without_error_boundary_fires() {
+  assert_rule_fires(
+    "vue/architecture/no-async-setup-without-error-boundary",
+    "async-setup.vue",
+  );
+  assert_rule_silent(
+    "vue/architecture/no-async-setup-without-error-boundary",
+    "clean.vue",
+  );
+  assert_rule_silent(
+    "vue/architecture/no-async-setup-without-error-boundary",
+    "clean_full.vue",
+  );
+}
+
+#[test]
+fn category_fixtures_stay_within_their_category() {
+  // The per-category fixtures must not leak findings into other new
+  // categories (they may share security/best-practice rules, which is
+  // expected; the point is each category fixture exercises its own).
+  for (fixture_name, category) in [
+    ("vulnerable_performance.vue", "performance"),
+    ("vulnerable_accessibility.vue", "accessibility"),
+    ("vulnerable_architecture.vue", "architecture"),
+    ("async-setup.vue", "architecture"),
+  ] {
+    let violations = scan(fixture_name);
+    for v in &violations {
+      assert!(
+        v.category.as_str() == category
+          || v.category.as_str() == "security"
+          || v.category.as_str() == "best-practice",
+        "{fixture_name} produced a {category} violation for {}",
+        v.rule_id
+      );
+    }
+  }
+}
+
+// ---------------------------------------------------------------------
 // CLI plumbing smoke tests (the binary really runs, flags reach the
 // scanner, exit codes are correct).
 // ---------------------------------------------------------------------
@@ -298,6 +457,9 @@ fn binary_list_lists_every_rule() {
     "vue/security/no-v-html",
     "vue/security/no-postmessage-wildcard",
     "vue/best-practice/v-for-missing-key",
+    "vue/performance/no-v-if-with-v-for",
+    "vue/accessibility/no-img-without-alt",
+    "vue/architecture/no-side-effect-in-computed",
   ] {
     assert!(
       out.stdout.contains(rule),
@@ -431,6 +593,34 @@ fn binary_category_flag_narrows_to_subset() {
       v["category"], "security",
       "--category should narrow to security: {v}"
     );
+  }
+}
+
+#[test]
+fn binary_category_flag_selects_phase_3_categories() {
+  use crate::common::Vuer;
+  for (category, fixture_name) in [
+    ("performance", "vulnerable_performance.vue"),
+    ("accessibility", "vulnerable_accessibility.vue"),
+    ("architecture", "vulnerable_architecture.vue"),
+  ] {
+    let out = Vuer::new()
+      .format("json")
+      .input(fixture(fixture_name))
+      .category(&[category])
+      .run();
+    let json: serde_json::Value = serde_json::from_str(&out.stdout).unwrap();
+    let arr = json.as_array().unwrap();
+    assert!(
+      !arr.is_empty(),
+      "--category {category} should find findings in {fixture_name}"
+    );
+    for v in arr {
+      assert_eq!(
+        v["category"], category,
+        "--category {category} should narrow to {category}: {v}"
+      );
+    }
   }
 }
 
