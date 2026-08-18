@@ -35,5 +35,16 @@ expression: json
     "rule_id": "vue/best-practice/no-inline-style",
     "rule_name": "no-inline-style",
     "severity": "low"
+  },
+  {
+    "byte_length": 21,
+    "byte_offset": 65,
+    "category": "accessibility",
+<FIXTURE>/vulnerable.vue",
+    "ignored": false,
+    "message": "`<img>` without an `alt` attribute",
+    "rule_id": "vue/accessibility/no-img-without-alt",
+    "rule_name": "no-img-without-alt",
+    "severity": "medium"
   }
 ]

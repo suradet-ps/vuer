@@ -6,18 +6,29 @@ use crate::rule_id::RuleId;
 use crate::severity::Severity;
 use crate::taint::FlowPath;
 
+pub mod no_async_setup_without_error_boundary;
+pub mod no_button_without_type;
+pub mod no_click_without_role_keyboard;
 pub mod no_dangerous_url;
+pub mod no_deep_watch_without_handler;
 pub mod no_document_write;
 pub mod no_dynamic_bind;
 pub mod no_eval;
 pub mod no_fetch_without_timeout;
+pub mod no_form_without_label;
+pub mod no_img_without_alt;
 pub mod no_inline_styles;
 pub mod no_inner_html;
+pub mod no_large_list_without_virtualization;
+pub mod no_mutation_of_props;
 pub mod no_open_redirect;
 pub mod no_postmessage_wildcard;
+pub mod no_reactive_in_v_for;
+pub mod no_side_effect_in_computed;
 pub mod no_unsafe_iframe;
 pub mod no_unsafe_localstorage;
 pub mod no_v_html;
+pub mod no_v_if_with_v_for;
 pub mod no_watch_with_callback;
 pub mod no_window_open_blank_noopener;
 pub mod v_for_missing_key;
@@ -151,6 +162,20 @@ impl RuleRegistry {
       Box::new(no_inline_styles::NoInlineStyle),
       Box::new(no_watch_with_callback::NoWatchWithCallback),
       Box::new(v_for_missing_key::VForMissingKey),
+      // Performance
+      Box::new(no_v_if_with_v_for::NoVIfWithVFor),
+      Box::new(no_deep_watch_without_handler::NoDeepWatchWithoutHandler),
+      Box::new(no_reactive_in_v_for::NoReactiveInVFor),
+      Box::new(no_large_list_without_virtualization::NoLargeListWithoutVirtualization),
+      // Accessibility
+      Box::new(no_img_without_alt::NoImgWithoutAlt),
+      Box::new(no_click_without_role_keyboard::NoClickWithoutRoleKeyboard),
+      Box::new(no_form_without_label::NoFormWithoutLabel),
+      Box::new(no_button_without_type::NoButtonWithoutType),
+      // Architecture
+      Box::new(no_side_effect_in_computed::NoSideEffectInComputed),
+      Box::new(no_mutation_of_props::NoMutationOfProps),
+      Box::new(no_async_setup_without_error_boundary::NoAsyncSetupWithoutErrorBoundary),
     ];
     Self { rules }
   }

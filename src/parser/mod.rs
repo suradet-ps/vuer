@@ -217,7 +217,16 @@ fn scan_block_end(source: &str, from: usize, kind: BlockKind) -> Option<usize> {
       j = after_name;
       continue;
     }
-    j = skip_tag(source, lt);
+    match kind {
+      // `<` inside a script or style body that is not a tag opener is a
+      // JS/CSS operator (e.g. `i < items.length`). Advancing to the next
+      // `>` would swallow the rest of the block (including its closing
+      // tag), so move one byte and keep scanning.
+      BlockKind::Script | BlockKind::Style => j = lt + 1,
+      // Templates can contain arbitrary tags; skip a non-matching tag as
+      // a unit so its `>` does not confuse the scan.
+      BlockKind::Template => j = skip_tag(source, lt),
+    }
   }
   None
 }

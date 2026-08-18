@@ -82,6 +82,40 @@ fn script_element_inside_template_is_not_a_script_block() {
 }
 
 #[test]
+fn script_less_than_operator_does_not_truncate_the_block() {
+  // `i < items.length` puts a bare `<` in the script body. The boundary
+  // scanner must not skip to the next `>` (the close tag's), which would
+  // swallow the rest of the block and lose the script entirely.
+  let ctx = parse(
+    "<script>\n\
+       for (let i = 0; i < items.length; i++) {\n\
+         const r = ref(items[i])\n\
+       }\n\
+     </script>",
+  );
+  assert!(
+    ctx
+      .script
+      .as_deref()
+      .expect("script block must be extracted")
+      .contains("i < items.length")
+  );
+  assert!(ctx.template_errors.is_empty());
+}
+
+#[test]
+fn style_less_than_comparison_does_not_truncate_the_block() {
+  let ctx = parse("<style>\n@media (min-width: 600px) { a > b { } }\n</style>");
+  assert!(
+    ctx
+      .style_blocks
+      .first()
+      .expect("style block must be extracted")
+      .contains("min-width")
+  );
+}
+
+#[test]
 fn comment_containing_closing_tag_is_skipped() {
   let ctx = parse(
     "<template>\n\

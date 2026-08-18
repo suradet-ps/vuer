@@ -58,5 +58,17 @@ expression: out.stdout
     "byte_offset": 96,
     "byte_length": 36,
     "ignored": false
+  },
+  {
+<FIXTURE>/vulnerable.vue",
+    "rule_id": "vue/accessibility/no-img-without-alt",
+    "rule_name": "no-img-without-alt",
+    "severity": "medium",
+    "category": "accessibility",
+    "message": "`<img>` without an `alt` attribute",
+    "help": "Screen readers announce the `alt` text in place of the image. Add `alt=\"description\"`, or `alt=\"\"` for purely decorative images. Dynamic images can bind `:alt=\"item.label\"`.",
+    "byte_offset": 65,
+    "byte_length": 21,
+    "ignored": false
   }
 ]

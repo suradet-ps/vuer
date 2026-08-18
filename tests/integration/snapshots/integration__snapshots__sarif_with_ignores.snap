@@ -312,6 +312,226 @@ expression: json
                 "category": "best-practice",
                 "security_severity": "medium"
               }
+            },
+            {
+              "id": "vue/performance/no-v-if-with-v-for",
+              "name": "vue/performance/no-v-if-with-v-for",
+              "short_description": {
+                "text": "Disallow `v-if` with `v-for` on the same element"
+              },
+              "full_description": {
+                "text": "Vue 3 evaluates `v-if` before `v-for`, so the list is built and then discarded when the condition is false."
+              },
+              "help": {
+                "text": "Filter the list with a computed property instead."
+              },
+              "default_configuration": {
+                "level": "warning"
+              },
+              "properties": {
+                "category": "performance",
+                "security_severity": "medium"
+              }
+            },
+            {
+              "id": "vue/performance/no-deep-watch-without-handler",
+              "name": "vue/performance/no-deep-watch-without-handler",
+              "short_description": {
+                "text": "Disallow deep watchers on inline options"
+              },
+              "full_description": {
+                "text": "A `watch(source, cb, { deep: true })` watcher re-compares every nested property on each mutation."
+              },
+              "help": {
+                "text": "Watch an explicit path or use `{ once: true }`."
+              },
+              "default_configuration": {
+                "level": "note"
+              },
+              "properties": {
+                "category": "performance",
+                "security_severity": "low"
+              }
+            },
+            {
+              "id": "vue/performance/no-reactive-in-v-for",
+              "name": "vue/performance/no-reactive-in-v-for",
+              "short_description": {
+                "text": "Disallow reactive creation in loop bodies"
+              },
+              "full_description": {
+                "text": "Creating `ref`/`reactive`/`computed` wrappers inside a loop allocates a fresh effect per iteration."
+              },
+              "help": {
+                "text": "Hoist the wrapper out of the loop."
+              },
+              "default_configuration": {
+                "level": "note"
+              },
+              "properties": {
+                "category": "performance",
+                "security_severity": "low"
+              }
+            },
+            {
+              "id": "vue/performance/no-large-list-without-virtualization",
+              "name": "vue/performance/no-large-list-without-virtualization",
+              "short_description": {
+                "text": "Heuristic: large lists need virtual scrolling"
+              },
+              "full_description": {
+                "text": "A `v-for` over a large-looking collection without a virtual-scroll wrapper can freeze the main thread."
+              },
+              "help": {
+                "text": "Wrap the list in a virtual-scroll component or paginate."
+              },
+              "default_configuration": {
+                "level": "note"
+              },
+              "properties": {
+                "category": "performance",
+                "security_severity": "low"
+              }
+            },
+            {
+              "id": "vue/accessibility/no-img-without-alt",
+              "name": "vue/accessibility/no-img-without-alt",
+              "short_description": {
+                "text": "Require `alt` on `<img>`"
+              },
+              "full_description": {
+                "text": "An image without `alt` is announced as its filename (or skipped) by screen readers."
+              },
+              "help": {
+                "text": "Add `alt` text, or `alt=\"\"` for decorative images."
+              },
+              "default_configuration": {
+                "level": "warning"
+              },
+              "properties": {
+                "category": "accessibility",
+                "security_severity": "medium"
+              }
+            },
+            {
+              "id": "vue/accessibility/no-click-without-role-keyboard",
+              "name": "vue/accessibility/no-click-without-role-keyboard",
+              "short_description": {
+                "text": "Require `role` + keyboard on `@click` of non-interactive elements"
+              },
+              "full_description": {
+                "text": "An element that reacts to clicks but cannot receive keyboard focus is unreachable for keyboard-only users."
+              },
+              "help": {
+                "text": "Use a real interactive element, or add `role` and a keyboard handler."
+              },
+              "default_configuration": {
+                "level": "warning"
+              },
+              "properties": {
+                "category": "accessibility",
+                "security_severity": "medium"
+              }
+            },
+            {
+              "id": "vue/accessibility/no-form-without-label",
+              "name": "vue/accessibility/no-form-without-label",
+              "short_description": {
+                "text": "Require a label on form fields"
+              },
+              "full_description": {
+                "text": "An unlabelled input is announced only as its type by screen readers."
+              },
+              "help": {
+                "text": "Associate a `<label>` or add `aria-label`."
+              },
+              "default_configuration": {
+                "level": "warning"
+              },
+              "properties": {
+                "category": "accessibility",
+                "security_severity": "medium"
+              }
+            },
+            {
+              "id": "vue/accessibility/no-button-without-type",
+              "name": "vue/accessibility/no-button-without-type",
+              "short_description": {
+                "text": "Require `type` on `<button>`"
+              },
+              "full_description": {
+                "text": "A `<button>` without `type` defaults to `submit`, so a click inside a form submits and navigates."
+              },
+              "help": {
+                "text": "Set `type=\"button\"` for in-page actions."
+              },
+              "default_configuration": {
+                "level": "note"
+              },
+              "properties": {
+                "category": "accessibility",
+                "security_severity": "low"
+              }
+            },
+            {
+              "id": "vue/architecture/no-side-effect-in-computed",
+              "name": "vue/architecture/no-side-effect-in-computed",
+              "short_description": {
+                "text": "Disallow side effects in `computed`"
+              },
+              "full_description": {
+                "text": "A computed getter must be pure; Vue re-evaluates it lazily and unpredictably."
+              },
+              "help": {
+                "text": "Move side effects to a `watch` or event handler."
+              },
+              "default_configuration": {
+                "level": "warning"
+              },
+              "properties": {
+                "category": "architecture",
+                "security_severity": "medium"
+              }
+            },
+            {
+              "id": "vue/architecture/no-mutation-of-props",
+              "name": "vue/architecture/no-mutation-of-props",
+              "short_description": {
+                "text": "Disallow `defineProps` writes"
+              },
+              "full_description": {
+                "text": "Writing to a prop diverges the child from the parent and is lost on the next re-render."
+              },
+              "help": {
+                "text": "`emit` an event and let the parent update its state."
+              },
+              "default_configuration": {
+                "level": "warning"
+              },
+              "properties": {
+                "category": "architecture",
+                "security_severity": "medium"
+              }
+            },
+            {
+              "id": "vue/architecture/no-async-setup-without-error-boundary",
+              "name": "vue/architecture/no-async-setup-without-error-boundary",
+              "short_description": {
+                "text": "Heuristic: `async setup()` needs `<Suspense>`"
+              },
+              "full_description": {
+                "text": "An `async setup()` component renders nothing until its promise resolves without a `Suspense` boundary."
+              },
+              "help": {
+                "text": "Wrap the component in `<Suspense>` or suppress with a rationale."
+              },
+              "default_configuration": {
+                "level": "note"
+              },
+              "properties": {
+                "category": "architecture",
+                "security_severity": "low"
+              }
             }
           ]
         }

@@ -10,6 +10,52 @@ re-severed. Removing a rule is a major-version event announced here.
 
 ## [Unreleased]
 
+### Added
+
+- **Phase 3: the `performance`, `accessibility`, and `architecture`
+  categories are now populated** (11 new rules, 26 total):
+
+  *performance*:
+  - `no-v-if-with-v-for` — `v-if` and `v-for` on the same element are
+    discouraged in Vue 3; filter with a computed instead (Medium).
+  - `no-deep-watch-without-handler` — `watch(src, cb, { deep: true })`
+    traverses the whole object graph on every change (Low).
+  - `no-reactive-in-v-for` — `ref`/`reactive`/`computed` wrappers
+    created inside loop bodies allocate an effect per iteration that is
+    never released (Low).
+  - `no-large-list-without-virtualization` — heuristic: `v-for` over a
+    curated set of large-looking collection names without a
+    virtual-scroll wrapper (Low, documented heuristic).
+
+  *accessibility*:
+  - `no-img-without-alt` — screen readers announce an `<img>` by its
+    `alt` text; `alt=""` and bound forms are accepted (Medium).
+  - `no-click-without-role-keyboard` — `@click` on a non-interactive
+    element with neither `role` nor a keyboard handler is unreachable
+    for keyboard-only users (Medium).
+  - `no-form-without-label` — fields must be labelled via `<label for>`,
+    a wrapping `<label>`, or `aria-label`/`aria-labelledby` (Medium).
+  - `no-button-without-type` — a `<button>` defaults to `submit`, which
+    submits the form on any click (Low).
+
+  *architecture*:
+  - `no-side-effect-in-computed` — assignments, mutating calls,
+    `fetch`/`watch`/`emit`, and `async` getters inside `computed(...)`
+    are re-run unpredictably by Vue (Medium).
+  - `no-mutation-of-props` — writes to `props.x` or a destructured
+    `defineProps` value break one-way data flow (Medium).
+  - `no-async-setup-without-error-boundary` — heuristic: `async setup()`
+    without a `<Suspense>` boundary renders nothing until the promise
+    settles (Low).
+
+### Fixed
+
+- SFC extraction no longer truncates a `<script>`/`<style>` block when
+  its body contains a bare `<` that is not a tag opener (e.g.
+  `i < items.length`): the boundary scanner previously skipped to the
+  next `>` — the closing tag's — and silently dropped the whole block,
+  silencing every script rule for that file.
+
 ### Changed
 
 - `no-window-open-blank-noopener` is now taint-gated: a provably clean

@@ -66,7 +66,7 @@ CI gates in Phase 9.
       (`src/parser/template/`)
 - [x] Script parsing via `oxc_parser` + arena (`src/parser/script.rs`)
 - [x] Rule trait + `RuleRegistry` (`src/rules/mod.rs`); 15 rules across
-      `security` and `best-practice`
+      `security` and `best-practice` (26 since Phase 3)
 - [x] Output formats: pretty, JSON, minimal, SARIF 2.1.0
       (`src/report/`)
 - [x] Inline suppression: `vuer-ignore[...]` / `vuer: ignore[...]` with
@@ -224,18 +224,22 @@ an attribute and flag it. A real SAST tool reasons about *data flow*.
 `Architecture`, and the CLI `--category` filter already accepts them — but no
 rule implements them. Either populate them or remove them with a rationale.
 
-- [ ] **`performance` rules (proposed):**
+- [x] **`performance` rules:**
   - `no-v-if-with-v-for` — Vue 3 forbids using `v-if` and `v-for` on the
     same element; flag and suggest computed filtering.
   - `no-deep-watch-without-handler` — `watch(src, cb, { deep: true })`
     without an explicit handler object / without `{ once }` where applicable.
-  - `no-unnecessary-computed-in-loop` / `no-reactive-in-v-for` — reactive
-    object creation inside `v-for` bodies.
+  - `no-reactive-in-v-for` — reactive object creation inside `v-for`
+    bodies (loop statements and array-iteration callbacks).
   - `no-large-list-without-virtualization` — heuristic: `v-for` over a
     variable whose name implies a large/remote collection without a known
     virtual scroll wrapper (low-severity, best-effort, documented as
     heuristic).
-- [ ] **`accessibility` rules (proposed):**
+      Implemented as `vue/performance/*` (4 rules) with unit + integration
+      coverage; the large-list name list is curated (generic names like
+      `items` are not flagged) and the heuristic is documented in
+      `docs/audits.md`.
+- [x] **`accessibility` rules:**
   - `no-img-without-alt` — `<img>` without `alt` (template walk).
   - `no-click-without-role-keyboard` — `@click` on a non-interactive element
     without `role` + `@keydown`/keyboard handler.
@@ -243,17 +247,25 @@ rule implements them. Either populate them or remove them with a rationale.
     `<label>` or `aria-label`.
   - `no-button-without-type` — `<button>` without explicit `type` (defaults to
     `submit`).
-- [ ] **`architecture` rules (proposed, conservative):**
+      Implemented as `vue/accessibility/*` (4 rules); `no-form-without-label`
+      resolves `<label for>` associations and wrapping `<label>`s within the
+      template, and bound/unprovable attribute forms are accepted to keep the
+      false-positive rate low.
+- [x] **`architecture` rules (conservative):**
   - `no-side-effect-in-computed` — assignments / async / `watch`-like side
     effects inside `computed(() => ...)`.
   - `no-mutation-of-props` — writing to a `defineProps` destructured value or
     `props.x = ...`.
   - `no-async-setup-without-error-boundary` — `async setup()` without a
     sibling `<Suspense>` (heuristic, low-severity).
-- [ ] **Decision gate:** if a category cannot reach a meaningful rule count
-      with low false-positive rates, remove it from `Category` and the CLI
-      filter, and document why in `docs/audits.md` and the roadmap. Do not
-      ship empty categories that imply coverage we do not have.
+      Implemented as `vue/architecture/*` (3 rules) with documented scope
+      boundaries per rule (Options API `computed:`/`this.x` forms deferred;
+      nested function bodies in getters not descended into).
+- [x] **Decision gate:**
+      Met with all three categories populated at a meaningful rule count
+      (4 + 4 + 3) and per-rule low-false-positive boundaries documented in
+      `docs/audits.md`; the CLI `--category` filter is covered by
+      integration tests for each new category.
 
 ---
 
@@ -476,7 +488,7 @@ Phase 2 was intra-file. Real Vue apps spread risk across files.
 |---|---|
 | `src/parser/template/` | Phase 1 (conformance), Phase 2 (taint sources in template) |
 | `src/parser/script.rs` (`oxc`) | Phase 2 (taint on script AST), Phase 6 (imports) |
-| `src/rules/` (15 rules) | Phase 2 (taint upgrade), Phase 3 (new categories), Phase 4 (fixes) |
+| `src/rules/` (26 rules) | Phase 2 (taint upgrade), Phase 3 (new categories, done), Phase 4 (fixes) |
 | `src/report/sarif.rs` | Phase 5 (LSP hover), Future (codeFlows) |
 | `src/config.rs` | Phase 7 (overrides, baseline, ignore) |
 | `src/scanner.rs` | Phase 6 (parse cache), Phase 7 (exit codes), Phase 9 (budgets) |
