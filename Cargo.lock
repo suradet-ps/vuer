@@ -1572,7 +1572,7 @@ dependencies = [
  "oxc_ast_visit",
  "oxc_diagnostics 0.146.0",
  "oxc_parser",
- "oxc_span 0.144.0",
+ "oxc_span 0.146.0",
  "oxc_syntax",
  "rayon",
  "regex",
