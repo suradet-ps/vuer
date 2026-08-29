@@ -154,4 +154,4 @@ parser's no-panic discipline on every push.
   ─────────────────────────────────────────
 ```
 
-MIT.
+Source code under the MIT License.
