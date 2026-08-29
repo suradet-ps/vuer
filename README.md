@@ -1,391 +1,157 @@
 # Vuer
 
-A security-focused, AST-based static analyser for Vue.js Single File Components,
-written in Rust. Inspired by `zizmor`, `Ruff`, `Clippy`, `Semgrep`, and `CodeQL`.
-
-Vuer is **not** an ESLint plugin. It parses each `.vue` file with its own
-template parser and `oxc_parser` for the script block, then runs every enabled
-rule against the resulting AST.
-
-## Goals
-
-1. **Accuracy over convenience** - low false positives, low false negatives,
-   actionable remediation.
-2. **AST analysis over string matching** - rules consume structure, not text.
-3. **Performance over abstraction** - arena allocation, borrowed data, zero-copy
-   parsing where possible.
-4. **Developer experience over cleverness** - clear diagnostics, stable rule
-   ids, and SARIF output for CI integration.
-
-## Features
-
-- **Security rules**: `v-html`, `innerHTML`, `document.write`, `eval`,
-  `new Function`, dangerous URL schemes, open-redirect, `localStorage`
-  token storage, missing `sandbox` on `iframe`, `postMessage` with
-  wildcard `targetOrigin`, `window.open` with `_blank` and no `noopener`,
-  `fetch` without an `AbortSignal`.
-- **Vue best practices**: missing `:key` on `v-for`, inline styles,
-  `watch` callbacks that may leak.
-- **Severity model**: `Critical` / `High` / `Medium` / `Low` / `Info`,
-  with a clean SARIF mapping.
-- **Taint analysis**: a single-pass intra-file taint engine (Phase 2)
-  tracks untrusted data from sources (`localStorage`, `fetch`,
-  `useRoute`, `defineProps` props, `event`, ...) through propagation
-  to sinks (`v-html`, `.innerHTML`, dynamic `:src`, `location`
-  writes). Taint-aware rules report *flows* — `taint from
-  localStorage.getItem (line 2) reaches `v-html` binding via
-  userInput` — and stay silent on provably clean bindings, cutting
-  false positives without losing the unsafe path.
-- **Output formats**: pretty, JSON, minimal, **SARIF 2.1.0**
-  (GitHub Code Scanning / GitLab Security Reports ready).
-- **Category and severity filters** to scope runs to one area or to
-  only fail the build on high-severity findings.
-- **Fast**: Rust-powered, no runtime overhead, `.gitignore` aware.
-
-## Installation
-
-```bash
-cargo install --path .
+```
+██╗   ██╗██╗   ██╗███████╗██████╗
+██║   ██║██║   ██║██╔════╝██╔══██╗
+██║   ██║██║   ██║█████╗  ██████╔╝
+╚██╗ ██╔╝██║   ██║██╔══╝  ██╔══██╗
+ ╚████╔╝ ╚██████╔╝███████╗██║  ██║
+  ╚═══╝ ╚═════╝ ╚══════╝╚═╝  ╚═╝
 ```
 
-Or build from source:
+---
 
-```bash
-cargo build --release
-```
+## ◆ PULSE
 
-The binary is at `target/release/vuer`.
+`v-html` looks like a feature until it looks like a CVE. Vuer is a
+security-focused, AST-based static analyser for Vue Single File
+Components, written in Rust - not an ESLint plugin, not a regex sweep.
+It parses every `.vue` file with its own template parser and
+`oxc_parser` for the script block, then asks the structure the
+questions: does untrusted data reach `v-html`? Does `innerHTML` carry
+user input? Did `fetch` forget its `AbortSignal`? Taint-aware rules
+report flows - source to sink - and stay silent on provably clean
+bindings. The analyser that reads your components like a compiler.
 
-## Usage
+| Taint ▣ | 28 rules ▣ | SARIF ▣ | No regex ▣ |
+|---|---|---|---|
 
-### Scan a single file
+*P0-P3 are sealed - foundation, parser correctness, the taint engine,
+and the declared categories. Autofix, integrations, and v1.0 stand
+open.*
 
-```bash
-vuer src/components/MyComponent.vue
-```
+> Built with Rust, inspired by zizmor, Ruff, Clippy, Semgrep, and
+> CodeQL - structure over strings, accuracy over convenience.
+>
+> **suradet-ps**, artifact keeper
 
-### Scan a directory
+---
 
-```bash
-vuer src/
-```
+## ◆ IGNITION
 
-This recursively scans all `.vue` files (respecting `.gitignore`).
-
-### List available rules
-
-```bash
-vuer --list
-```
-
-### Run specific rules
-
-```bash
-vuer --rules no-v-html,no-dynamic-bind-src src/
-vuer --rules vue/security/no-v-html src/
-```
-
-You can mix short names and stable ids.
-
-### Filter by category or severity
-
-```bash
-vuer --category security src/
-vuer --min-severity high src/
-```
-
-### Output formats
-
-```bash
-# Pretty (default) - coloured diagnostics
-vuer src/
-
-# JSON - one structured record per finding
-vuer --format json src/
-
-# SARIF 2.1.0 - GitHub Code Scanning / GitLab
-vuer --format sarif src/ > results.sarif
-
-# Minimal - one line per violation
-vuer --format minimal src/
-```
-
-### CI integration
-
-Fail with exit code 1 if any violation is found:
-
-```bash
-vuer --deny-warnings src/
-```
-
-Or only on at least `high` severity:
-
-```bash
-vuer --min-severity high --deny-warnings src/
-```
-
-### Suppressing individual findings
-
-Use a `vuer-ignore[...]` comment on the same line (or the line above) the
-finding to silence it. Both the short rule name (`no-v-html`) and the full
-stable id (`vue/security/no-v-html`) are accepted. The colon form
-(`vuer: ignore[...]`) is also recognised.
-
-```vue
-<template>
-  <div v-html="trusted">accepted</div>
-  <!-- vuer-ignore[no-v-html] -->
-  <div v-html="trusted">silenced by the previous-line comment</div>
-</template>
-
-<script setup>
-el.innerHTML = userInput  // vuer-ignore[no-inner-html]
-</script>
-```
-
-Use `--no-ignores` to disable every inline suppression and report what
-the linter would otherwise silence. This is the right flag for CI runs
-that want to see the *raw* signal.
-
-## Output
-
-The pretty output is rustc-style: each finding is a coloured
-`error[rule-id]` block with an `--> file:line:col` header, a snippet with
-carets under the violation, and a `= help:` line with the remediation
-advice. The summary at the bottom counts findings by severity, each
-coloured to match the finding (critical = magenta, high = red, medium =
-yellow, low = cyan, info = green).
-
-```text
-error[vue/security/no-v-html]: Unsafe `v-html` directive renders untrusted HTML
- --> src/components/Post.vue:8:10
-  |
-8 |     <div v-html="user.bio">Bio</div>
-  |          ^^^^^^^^^^^^^^^^^^^ here
-  |
-  = help: Rendering untrusted HTML can execute arbitrary JavaScript. Sanitise the input
-          with DOMPurify (or an equivalent library), or use `v-text` / `{{ }}` interpolation.
-
-13 violations: 3 critical, 7 high, 2 medium, 1 low
-```
-
-Colours are auto-detected from the terminal. They are stripped when
-output is piped to a file, when stdout is not a TTY, or when
-`NO_COLOR=1` is set in the environment. Set `FORCE_COLOR=1` to force
-them on for CI logs.
-
-## Configuration
-
-Drop a `.vuerc.yml` (or `vuer.yml`) at the project root to set
-project-wide defaults. The first one found walking up from the scan
-path is loaded.
-
-```yaml
-# .vuerc.yml — every field is optional.
-
-# Disable rules by short name or full stable id.
-disable:
-  - no-v-html
-  - vue/security/no-eval
-
-# Only show findings at this severity or higher.
-# Allowed: info, low, medium, high, critical
-min-severity: medium
-
-# Only show findings whose category is in this list.
-# Allowed: security, best-practice, performance, accessibility, architecture
-category:
-  - security
-  - best-practice
-```
-
-CLI flags layer on top of the config: `--rules` is an enable-list
-that further narrows the result, `--min-severity` and `--category`
-override the config when set, and `--no-config` skips discovery
-entirely (handy for hermetic CI runs).
-
-Unknown keys are rejected (`deny_unknown_fields`), so a typo like
-`min-sev: high` will print a parse warning and fall back to the
-default config. The run is never blocked by a broken config file.
-
-## Performance
-
-`vuer` walks the directory tree single-threaded (the work is just path
-filtering + `.gitignore` checks) and then fans out the per-file
-parsing across the rayon thread pool. On a large Vue monorepo this
-gives a near-linear speedup with the number of cores.
-
-## Documentation
-
-Full reference documentation lives under `docs/`:
-
-* [Installation](docs/installation.md) — install via crates.io, GitHub,
-  pre-built binaries, or from source; editor and CI integration.
-* [Usage](docs/usage.md) — every CLI flag, output format, suppression
-  mechanism, and recommended workflows.
-* [Audits](docs/audits.md) — one section per rule, with vulnerable
-  and safe examples plus remediation advice.
-* [Upgrading](docs/upgrading.md) — the `oxc` bump / MSRV discipline.
-
-## Available rules
-
-| Rule id | Severity | Category | Description |
-|---------|----------|----------|-------------|
-| `vue/security/no-v-html` | Critical | security | Disallow `v-html` when the binding may carry untrusted data |
-| `vue/security/no-inner-html` | Critical | security | Disallow `el.innerHTML = ...` when the value may be untrusted |
-| `vue/security/no-document-write` | High | security | Disallow `document.write` / `writeln` |
-| `vue/security/no-eval` | Critical | security | Disallow `eval`, `new Function`, string `setTimeout` |
-| `vue/security/no-dangerous-url` | Critical | security | Disallow `javascript:` / `data:text/html` / `vbscript:` URLs |
-| `vue/security/no-open-redirect` | High | security | Disallow `location.*` writes of untrusted values |
-| `vue/security/no-unsafe-localstorage` | High | security | Disallow auth-looking values in `localStorage` |
-| `vue/security/no-unsafe-iframe` | Medium | security | Disallow `<iframe>` without `sandbox` |
-| `vue/security/no-dynamic-bind-src` | High | security | Disallow `:src` bindings of untrusted values |
-| `vue/security/no-postmessage-wildcard` | High | security | Disallow `postMessage(..., '*')` |
-| `vue/security/no-window-open-blank-noopener` | High | security | Require `noopener` on `window.open(..., '_blank', ...)` |
-| `vue/security/no-fetch-without-timeout` | High | security | Require an `AbortSignal` on `fetch` |
-| `vue/best-practice/no-inline-style` | Low | best-practice | Disallow inline `style` |
-| `vue/best-practice/no-watch-with-callback` | Low | best-practice | Warn on `watch(src, cb)` without disposal |
-| `vue/best-practice/v-for-missing-key` | Medium | best-practice | Require `:key` on `v-for` |
-| `vue/performance/no-v-if-with-v-for` | Medium | performance | Disallow `v-if` with `v-for` on the same element |
-| `vue/performance/no-deep-watch-without-handler` | Low | performance | Warn on `watch(..., { deep: true })` |
-| `vue/performance/no-reactive-in-v-for` | Low | performance | Disallow reactive creation in loop bodies |
-| `vue/performance/no-large-list-without-virtualization` | Low | performance | Heuristic: large lists need virtual scrolling |
-| `vue/accessibility/no-img-without-alt` | Medium | accessibility | Require `alt` on `<img>` |
-| `vue/accessibility/no-click-without-role-keyboard` | Medium | accessibility | Require `role` + keyboard on `@click` of non-interactive elements |
-| `vue/accessibility/no-form-without-label` | Medium | accessibility | Require a label on form fields |
-| `vue/accessibility/no-button-without-type` | Low | accessibility | Require `type` on `<button>` |
-| `vue/architecture/no-side-effect-in-computed` | Medium | architecture | Disallow side effects in `computed` |
-| `vue/architecture/no-mutation-of-props` | Medium | architecture | Disallow `defineProps` writes |
-| `vue/architecture/no-async-setup-without-error-boundary` | Low | architecture | Heuristic: `async setup()` needs `<Suspense>` |
-
-## Architecture
+One command, one binary.
 
 ```
-.vue file
-    |
-    v
-SFC extraction (template / script / style)
-    |
-    +-- template  -> native recursive-descent parser -> TemplateRoot
-    |                                                          |
-    |                                                          v
-    |                                                    visitor + rules
-    |
-    +-- script    -> oxc_parser (oxc_ast) -> Program
-                                                            |
-                                                            v
-                                                      visitor + rules
+⟫ cargo install --path .
+⟫ vuer src/
 ```
 
-Key design decisions:
-
-- **Taint-aware, not just syntactic.** After parsing, one taint pass
-  annotates every expression in the file (script + template bindings);
-  rules that query it report "this pattern carries untrusted data" with
-  a source→sink flow instead of just "this pattern exists".
-- **No regex in any rule.** The only place strings are read is the SFC
-  block extractor; from then on everything is structural.
-- **No `unwrap()`, `expect()`, or `panic!()` in production code.** Errors
-  in the SFC extractor and the parsers are surfaced alongside the parsed
-  AST; rules that fail to apply skip the file and report zero violations.
-  The template parser is additionally gated in CI against ever adding
-  one.
-- **A parse failure degrades to "needs review", never "clean".** When a
-  `<template>` block does not parse cleanly, the CLI warns per error
-  (file, byte offset, message) and counts the malformed files in the
-  summary; `--deny-warnings` fails the run. Machine formats on stdout
-  (JSON/SARIF) are untouched — the warning goes to stderr.
-- **All rules are independent and deterministic.** They take an
-  immutable `ScanContext` and return a `Vec<Box<dyn Diagnostic>>`.
-  Running the same file twice produces the same output.
-- **Spans are absolute** - rules produce diagnostics pointing at the
-  original file, not at the trimmed template body. A property test
-  re-slices the source by every node's span and asserts it equals the
-  node's text (see `tests/offset_integrity.rs`).
-
-### Scope: `<style>` blocks
-
-`<style>` blocks are extracted into `ScanContext::style_blocks` so future
-rules can inspect them, but CSS analysis is **out of scope for v1**. In
-particular, CSS injection via scoped `:deep()` selectors fed by dynamic
-values is documented, not detected: it requires CSS-level data flow that
-the Phase 1/2 taint model does not cover. The extractor's `Style` arm is
-therefore used (extraction) but no rule consumes it yet.
-
-### Layout
+Scan a file, a directory (`.gitignore`-aware), or the whole repo:
 
 ```
-src/
-  main.rs               # CLI (clap)
-  lib.rs                # module root
-  context.rs            # ScanContext, ScriptLang
-  scanner.rs            # file walking, Violation
-  severity.rs           # Critical/High/Medium/Low/Info
-  rule_id.rs            # stable string id
-  parser/
-    mod.rs              # SFC extraction
-    template/
-      ast.rs            # TemplateRoot data model
-      parser.rs         # recursive-descent template parser
-      mod.rs            # public re-exports
-    script.rs           # oxc_parser wrapper + callee_path / is_call_named helpers
-  rules/
-    mod.rs              # Rule trait, Category, RuleRegistry
-    no_v_html.rs
-    no_inner_html.rs
-    no_document_write.rs
-    no_eval.rs
-    no_dangerous_url.rs
-    no_open_redirect.rs
-    no_unsafe_localstorage.rs
-    no_unsafe_iframe.rs
-    no_dynamic_bind.rs
-    no_inline_styles.rs
-    no_watch_with_callback.rs
-    v_for_missing_key.rs
-    no_v_if_with_v_for.rs       # performance
-    no_deep_watch_without_handler.rs
-    no_reactive_in_v_for.rs
-    no_large_list_without_virtualization.rs
-    no_img_without_alt.rs       # accessibility
-    no_click_without_role_keyboard.rs
-    no_form_without_label.rs
-    no_button_without_type.rs
-    no_side_effect_in_computed.rs  # architecture
-    no_mutation_of_props.rs
-    no_async_setup_without_error_boundary.rs
-  visitor/
-    mod.rs              # walk / for_each_element
-  report/
-    mod.rs              # output formats
-    sarif.rs            # SARIF 2.1.0 serializer
-tests/
-  integration.rs        # end-to-end tests against fixture files
-  fixtures/             # clean / vulnerable Vue files
+⟫ vuer --rules no-v-html,no-dynamic-bind-src src/
+⟫ vuer --category security --min-severity high src/
+⟫ vuer --format sarif src/ > results.sarif
+⟫ vuer --deny-warnings src/      # fail CI on any finding
 ```
 
-## Adding a new rule
+<details>
+<summary>Configuration</summary>
 
-1. Create `src/rules/your_rule.rs` with a diagnostic struct and a
-   `Rule` impl.
-2. Pick the `Category` and `Severity`.
-3. Register the rule in `src/rules/mod.rs`.
-4. Add the rule id to `rule_meta` in `src/report/sarif.rs` so the
-   SARIF output picks up the description.
-5. Add a clean, vulnerable, and edge-case fixture (or extend an
-   existing one).
-6. Add a unit test and, where useful, an integration test.
+A `.vuerc.yml` at the project root sets project-wide defaults:
+`disable`, `min-severity`, and `category`. CLI flags layer on top;
+`--no-config` skips discovery for hermetic CI runs. Unknown keys are
+rejected with a warning - a broken config never blocks the run.
 
-## Development
+Findings are suppressed with `vuer-ignore[...]` comments, or surfaced
+in full with `--no-ignores`.
 
-```bash
-cargo build              # debug build
-cargo build --release    # release build
-cargo test               # unit + integration
-cargo run -- --list      # see all rules
-cargo run -- tests/      # scan the fixture files
+</details>
+
+---
+
+## ◆ ANATOMY
+
+One pipeline, four disciplines, zero regex in the rules.
+
+- **Parses** - the SFC extractor splits template, script, and style;
+  the template gets a native recursive-descent parser, the script
+  block gets `oxc_parser`. From then on, everything is structural.
+- **Taints** - one pass annotates every expression in the file with
+  data-flow: sources (`localStorage`, `fetch`, `useRoute`, props,
+  events) reach sinks (`v-html`, `innerHTML`, dynamic `:src`,
+  `location` writes) - and the rule reports the flow, with lines, not
+  just the pattern.
+- **Judges** - 28 rules across five categories - security,
+  best-practice, performance, accessibility, architecture - with a
+  severity model from Critical to Info and a clean SARIF 2.1.0
+  mapping for GitHub Code Scanning and GitLab.
+- **Reports** - rustc-style pretty output with carets and `= help:`
+  remediation, plus JSON, minimal, and SARIF formats; colors that
+  respect TTY and `NO_COLOR`.
+- **Degrades** - a parse failure means "needs review", never "clean";
+  a rule that fails to apply skips the file and reports zero
+  violations; there is no `unwrap()`, `expect()`, or `panic!()` in
+  production code.
+- **Stays honest** - spans are absolute, rules are deterministic, and
+  an offset-integrity property test re-slices the source by every
+  node's span to prove the parser never lies about position.
+
+---
+
+## ◆ RITUALS
+
+**The core ceremony** - the pre-merge scan:
+
+1. Run `vuer src/` locally. The pretty output shows each finding
+   rustc-style: `error[rule-id]`, the caret, the help line.
+2. Read the flows: "taint from `localStorage.getItem` reaches
+   `v-html` via `userInput`" - the path is the lesson.
+3. Fix, or suppress with a `vuer-ignore[no-v-html]` comment and a
+   reason beside it.
+4. In CI, run `--deny-warnings` - and `--no-ignores` when the raw
+   signal must be seen.
+
+**The ceremony of the flow** - a rule that names the source and the
+sink is worth more than a rule that names the pattern. Taint-aware
+rules cut false positives without losing the unsafe path.
+
+**The ceremony of the clean page** - provably clean bindings are
+silent. The analyser's restraint is a feature: when Vuer does not
+complain, the structure has been read, not just matched.
+
+---
+
+## ◆ ECHOES
+
+**Where this artifact is heading**
+
+```
+P0-P1 ▸ foundation, parser conformance + offset integrity ──────────── ▸ sealed
+P2    ▸ taint engine: sources, propagation, flows ───────────────────── ▸ sealed
+P3    ▸ declared categories: security, perf, a11y, architecture ─────── ▸ sealed
+P4-P5 ▸ autofix, editor + CI integrations ────────────────────────────── ▸ open
+P6-P9 ▸ cross-file analysis, config depth, hardening, budgets ────────── ▸ open
+P10-P11 ▸ release engineering, v1.0.0 ────────────────────────────────── ▸ open
 ```
 
-## License
+**Raising the artifact** - the rule audit trail lives in
+`docs/audits.md`; installation and editor notes in `docs/installation.md`;
+the `oxc` bump and MSRV discipline in `docs/upgrading.md`. Adding a
+rule follows the documented ritual: rule module, registration, SARIF
+meta, fixtures, tests. Open an issue first to discuss a change.
 
-MIT
+**Status** - CI gates fmt, clippy with `-D warnings`, tests, and the
+parser's no-panic discipline on every push.
+[Watch the gates](.github/workflows).
+
+---
+
+```
+  ─────────────────────────────────────────
+   A linter that reads structure
+   sees what a regex can only guess.
+  ─────────────────────────────────────────
+```
+
+MIT.
