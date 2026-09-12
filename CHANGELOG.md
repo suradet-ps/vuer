@@ -10,6 +10,8 @@ re-severed. Removing a rule is a major-version event announced here.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-12
+
 ### Added
 
 - **Phase 3: the `performance`, `accessibility`, and `architecture`
@@ -55,6 +57,11 @@ re-severed. Removing a rule is a major-version event announced here.
   `i < items.length`): the boundary scanner previously skipped to the
   next `>` — the closing tag's — and silently dropped the whole block,
   silencing every script rule for that file.
+- Integration snapshot path filters now accept Windows separators and
+  JSON-escaped `\\` separators, so the suite runs on Windows.
+- `.gitattributes` pins every tracked file to LF: `core.autocrlf=true`
+  rewrote conformance fixtures and insta snapshots to CRLF at checkout,
+  failing the snapshot suite on Windows while CI stayed green.
 
 ### Changed
 
@@ -81,11 +88,15 @@ re-severed. Removing a rule is a major-version event announced here.
 - **MSRV lowered 1.97 → 1.95** — `oxc` 0.144 requires rustc 1.95.0,
   which is now the highest minimum in the dependency tree; CI pins
   `dtolnay/rust-toolchain` 1.95.0 to match.
-
-### Fixed
-
-- Integration snapshot path filters now accept Windows separators and
-  JSON-escaped `\\` separators, so the suite runs on Windows.
+- **`oxc` re-bumped 0.144/0.147 → 0.149** — renovate had moved the
+  direct dependencies one at a time, leaving three `oxc_allocator`
+  generations in the lockfile and mismatched `Allocator` types at the
+  `oxc_parser` call sites; the cohort is single-versioned again. No
+  source changes were needed for this step; the conformance, edge-case,
+  offset-integrity, and snapshot suites pass with zero diffs.
+- **MSRV raised 1.95 → 1.96** — `oxc` 0.149 requires rustc 1.96.0,
+  which is again the highest minimum in the dependency tree; CI pins
+  `dtolnay/rust-toolchain` 1.98.0, which stays above the floor.
 
 ## [0.2.0] - 2026-08-12
 
