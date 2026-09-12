@@ -37,6 +37,6 @@ rayon = "1.10"
 
 [dev-dependencies]
 tempfile = "3.27"
-rstest = "0.26"
+rstest = "0.27"
 insta = { version = "1", features = ["filters"] }
 assert_cmd = "2"
