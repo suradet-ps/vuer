@@ -1,0 +1,6 @@
+# Keep the working tree LF-only so file-reading tests (conformance
+# fixtures, insta snapshots) see byte-identical input on Windows as on
+# the ubuntu/macos CI runners. Without this, `core.autocrlf=true`
+# rewrites text files to CRLF at checkout and snapshot tests fail with
+# phantom `\r\n` diffs that CI never reproduces.
+* text=auto eol=lf
