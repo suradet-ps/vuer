@@ -1,0 +1,37 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+# Creating a GitHub Release is the one job that needs write access; the
+# rest of the workflows stay at `contents: read` (see `ci.yml`).
+# zizmor's `excessive-permissions` rule is satisfied by this explicit
+# grant instead of the repository default.
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          # zizmor's `artipacked` rule: don't let the GITHUB_TOKEN leak
+          # into any artifact or cache.
+          persist-credentials: false
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          BODY=$(awk "/^## \\[${VERSION}\\]/{found=1; next} /^## \\[/{if(found) exit} found{print}" CHANGELOG.md)
+          if [ -z "$BODY" ]; then
+            echo "::error::CHANGELOG.md has no '## [${VERSION}]' section" >&2
+            exit 1
+          fi
+          gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes "$BODY"
