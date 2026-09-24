@@ -51,7 +51,7 @@ jobs:
         # enforces this on every `cargo` invocation.
         uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87  # stable
         with:
-          toolchain: 1.98.0
+          toolchain: 1.98.1
           components: rustfmt, clippy
 
       - name: Cache cargo registry & build
