@@ -7,7 +7,7 @@ edition = "2024"
 # of the dependency review for every release.
 rust-version = "1.96"
 description = "A high-performance Vue.js SFC scanner with clear, actionable diagnostics"
-license = "MIT"
+license = "MIT OR Apache-2.0"
 
 [[bin]]
 name = "vuer"

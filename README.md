@@ -1,13 +1,9 @@
 # Vuer
 
-```
-██╗   ██╗██╗   ██╗███████╗██████╗ 
-██║   ██║██║   ██║██╔════╝██╔══██╗
-██║   ██║██║   ██║█████╗  ██████╔╝
-╚██╗ ██╔╝██║   ██║██╔══╝  ██╔══██╗
- ╚████╔╝ ╚██████╔╝███████╗██║  ██║
-  ╚═══╝   ╚═════╝ ╚══════╝╚═╝  ╚═╝  
-```
+[![CI](https://github.com/suradet-ps/vuer/actions/workflows/ci.yml/badge.svg)](https://github.com/suradet-ps/vuer/actions/workflows/ci.yml)
+[![License: MIT OR Apache-2.0](https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE-MIT)
+[![Rust: stable](https://img.shields.io/badge/rust-stable-orange.svg?logo=rust&logoColor=white)](https://www.rust-lang.org/)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/suradet-ps/vuer/issues)
 
 ---
 
@@ -154,4 +150,5 @@ parser's no-panic discipline on every push.
   ─────────────────────────────────────────
 ```
 
-Source code under the MIT License.
+Source code under the [MIT License](LICENSE-MIT) or
+[Apache-2.0](LICENSE-APACHE), at your option.
