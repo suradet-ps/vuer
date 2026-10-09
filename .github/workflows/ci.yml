@@ -49,7 +49,7 @@ jobs:
         # 1.96.0 is the MSRV: every release of `oxc` we use requires
         # rustc >= 1.96.0, and Cargo.toml's `rust-version` field
         # enforces this on every `cargo` invocation.
-        uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87  # stable
+        uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249  # stable
         with:
           toolchain: 1.98.0
           components: rustfmt, clippy
